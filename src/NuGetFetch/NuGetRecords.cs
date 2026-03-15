@@ -27,6 +27,9 @@ public record SearchResponse(
 public record SearchResult(
     string Id,
     string Version,
+    string? Description = null,
+    long TotalDownloads = 0,
+    bool Verified = false,
     IList<SearchVersion>? Versions = null);
 
 public record SearchVersion(

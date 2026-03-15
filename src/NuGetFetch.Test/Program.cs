@@ -91,6 +91,57 @@ Assert(matched is not null && matched.StartsWith("13.0."));
 Console.WriteLine($"{matched} ✓");
 passed++;
 
+// Test 9: Response cache
+Console.Write("Response cache... ");
+string cacheTempDir = Path.Combine(Path.GetTempPath(), $"nugetfetch-rc-{Guid.NewGuid():N}");
+try
+{
+    ResponseCache rc = new("nugetfetch-test", cacheTempDir);
+    Assert(rc.TryGet("test", "key1") is null);
+    rc.Set("test", "key1", """{"hello":"world"}""");
+    Assert(rc.TryGet("test", "key1") == """{"hello":"world"}""");
+
+    // TTL: should still be valid (just written)
+    Assert(rc.TryGet("test", "key1", TimeSpan.FromMinutes(1)) is not null);
+
+    // Bytes
+    rc.SetBytes("bin", "key2", [1, 2, 3]);
+    byte[]? bytes = rc.TryGetBytes("bin", "key2");
+    Assert(bytes is not null && bytes.Length == 3);
+
+    // Clear
+    long freed = rc.Clear("test");
+    Assert(freed > 0);
+    Assert(rc.TryGet("test", "key1") is null);
+    Console.WriteLine("✓");
+    passed++;
+}
+finally
+{
+    if (Directory.Exists(cacheTempDir))
+    {
+        Directory.Delete(cacheTempDir, true);
+    }
+}
+
+// Test 10: Search service
+Console.Write("Search... ");
+SearchService search = new(httpClient);
+IReadOnlyList<SearchResult> searchResults = await search.SearchAsync("Newtonsoft.Json", take: 3);
+Assert(searchResults.Count > 0);
+Assert(searchResults[0].Id is not null);
+Assert(searchResults[0].TotalDownloads > 0);
+Console.WriteLine($"{searchResults.Count} result(s), top: {searchResults[0].Id} ✓");
+passed++;
+
+// Test 11: Search by prefix
+Console.Write("Search by prefix... ");
+IReadOnlyList<SearchResult> prefixResults = await search.SearchByPrefixAsync("Humanizer", take: 10);
+Assert(prefixResults.Count > 0);
+Assert(prefixResults.All(r => r.Id.StartsWith("Humanizer", StringComparison.OrdinalIgnoreCase)));
+Console.WriteLine($"{prefixResults.Count} result(s) ✓");
+passed++;
+
 Console.WriteLine($"\n{passed}/{passed} tests passed ✅");
 
 static void Assert(bool condition, [System.Runtime.CompilerServices.CallerArgumentExpression(nameof(condition))] string? expr = null)
