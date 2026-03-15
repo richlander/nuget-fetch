@@ -201,6 +201,30 @@ public static class TfmResolver
         }
     }
 
-    private static bool IsTfmLike(string name) =>
+    /// <summary>
+    /// Extracts a TFM from a relative path like "lib/net8.0/Assembly.dll".
+    /// Returns the second-to-last path segment if it looks like a TFM.
+    /// </summary>
+    public static string? ExtractTfmFromPath(string relativePath)
+    {
+        string[] parts = relativePath.Split('/', '\\');
+
+        if (parts.Length >= 2)
+        {
+            string potential = parts[^2];
+
+            if (IsTfmLike(potential))
+            {
+                return potential;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Checks if a string looks like a TFM (starts with "net").
+    /// </summary>
+    public static bool IsTfmLike(string name) =>
         name.StartsWith("net", StringComparison.OrdinalIgnoreCase);
 }
