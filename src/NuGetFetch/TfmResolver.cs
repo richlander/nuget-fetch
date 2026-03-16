@@ -74,9 +74,27 @@ public static class TfmResolver
             }
 
             // Legacy .NET Framework (net45, net461, etc.)
+            // Normalize: net45 → 4.5.0, net452 → 4.5.2, net46 → 4.6.0
             if (int.TryParse(versionPart, out int frameworkVersion))
             {
-                return 1000 + frameworkVersion;
+                int fwMajor, fwMinor, fwPatch;
+
+                if (frameworkVersion < 100)
+                {
+                    // net45, net46 → major.minor.0
+                    fwMajor = frameworkVersion / 10;
+                    fwMinor = frameworkVersion % 10;
+                    fwPatch = 0;
+                }
+                else
+                {
+                    // net451, net462 → major.minor.patch
+                    fwMajor = frameworkVersion / 100;
+                    fwMinor = (frameworkVersion / 10) % 10;
+                    fwPatch = frameworkVersion % 10;
+                }
+
+                return 1000 + (fwMajor * 100) + (fwMinor * 10) + fwPatch;
             }
         }
 
@@ -203,19 +221,20 @@ public static class TfmResolver
 
     /// <summary>
     /// Extracts a TFM from a relative path like "lib/net8.0/Assembly.dll".
-    /// Returns the second-to-last path segment if it looks like a TFM.
+    /// Finds the first TFM-like path segment (after lib/ or tools/).
     /// </summary>
     public static string? ExtractTfmFromPath(string relativePath)
     {
         string[] parts = relativePath.Split('/', '\\');
 
-        if (parts.Length >= 2)
+        for (int i = 0; i < parts.Length - 1; i++)
         {
-            string potential = parts[^2];
-
-            if (IsTfmLike(potential))
+            if (IsTfmLike(parts[i]) &&
+                i > 0 &&
+                (parts[i - 1].Equals("lib", StringComparison.OrdinalIgnoreCase) ||
+                 parts[i - 1].Equals("tools", StringComparison.OrdinalIgnoreCase)))
             {
-                return potential;
+                return parts[i];
             }
         }
 
