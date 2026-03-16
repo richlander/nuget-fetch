@@ -97,16 +97,16 @@ PackageIdentity? parsed = PackageExtractor.ParsePackageReference("Newtonsoft.Jso
 
 ## API Overview
 
-| Class              | Kind     | Purpose                    |
-| ------------------ | -------- | -------------------------- |
-| `NuGetClient`      | Instance | Versions, download         |
-| `SearchService`    | Instance | Search and prefix search   |
-| `PackageCache`     | Instance | Two-tier package cache     |
-| `ResponseCache`    | Instance | Disk cache with TTL        |
-| `PackageExtractor` | Static   | Extract `.nupkg`, parse    |
-| `SourceResolver`   | Static   | Parse `nuget.config` files |
-| `TfmResolver`      | Static   | Select best TFM            |
-| `NuGetApi`         | Static   | Stream JSON deserialization |
+| Class              | Kind     | Purpose                      |
+| ------------------ | -------- | ---------------------------- |
+| `NuGetClient`      | Instance | Versions, download           |
+| `SearchService`    | Instance | Search and prefix search     |
+| `PackageCache`     | Instance | Two-tier package cache       |
+| `ResponseCache`    | Instance | Disk cache with TTL          |
+| `PackageExtractor` | Static   | Extract `.nupkg`, parse      |
+| `SourceResolver`   | Static   | Parse `nuget.config` files   |
+| `TfmResolver`      | Static   | Select best TFM              |
+| `NuGetApi`         | Static   | Stream JSON deserialization   |
 
 ## Design
 
