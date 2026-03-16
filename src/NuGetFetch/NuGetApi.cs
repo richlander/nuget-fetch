@@ -5,14 +5,41 @@ namespace NuGetFetch;
 
 public static class NuGetApi
 {
-    public static ValueTask<ServiceIndex?> GetServiceIndexAsync(Stream json) =>
-        JsonSerializer.DeserializeAsync(json, NuGetJsonContext.Default.ServiceIndex);
+    public static async ValueTask<ServiceIndex?> GetServiceIndexAsync(Stream json)
+    {
+        try
+        {
+            return await JsonSerializer.DeserializeAsync(json, NuGetJsonContext.Default.ServiceIndex);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
 
-    public static ValueTask<VersionIndex?> GetVersionIndexAsync(Stream json) =>
-        JsonSerializer.DeserializeAsync(json, NuGetJsonContext.Default.VersionIndex);
+    public static async ValueTask<VersionIndex?> GetVersionIndexAsync(Stream json)
+    {
+        try
+        {
+            return await JsonSerializer.DeserializeAsync(json, NuGetJsonContext.Default.VersionIndex);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
 
-    public static ValueTask<SearchResponse?> GetSearchResponseAsync(Stream json) =>
-        JsonSerializer.DeserializeAsync(json, NuGetJsonContext.Default.SearchResponse);
+    public static async ValueTask<SearchResponse?> GetSearchResponseAsync(Stream json)
+    {
+        try
+        {
+            return await JsonSerializer.DeserializeAsync(json, NuGetJsonContext.Default.SearchResponse);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
 }
 
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
