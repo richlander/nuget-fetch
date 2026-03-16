@@ -106,7 +106,7 @@ PackageIdentity? parsed = PackageExtractor.ParsePackageReference("Newtonsoft.Jso
 | `PackageExtractor` | Static   | Extract `.nupkg`, parse      |
 | `SourceResolver`   | Static   | Parse `nuget.config` files   |
 | `TfmResolver`      | Static   | Select best TFM              |
-| `NuGetApi`         | Static   | Stream JSON deserialization   |
+| `NuGetApi`         | Static   | Stream JSON deserialization  |
 
 ## Design
 
