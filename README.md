@@ -6,7 +6,7 @@ A lightweight NuGet client library for downloading and extracting
 NuGet packages. Designed for AOT compatibility with zero
 HttpClient ownership — bring your own.
 
-```
+```shell
 dotnet add package NuGetFetch
 ```
 
