@@ -14,14 +14,23 @@ public class NuGetClient(HttpClient client)
 
     /// <summary>
     /// Gets all available versions for a package from a NuGet source.
+    /// Returns empty list if the package does not exist.
     /// </summary>
     public async Task<IReadOnlyList<string>> GetVersionsAsync(string packageId, string? sourceUrl = null)
     {
         string baseAddress = await ResolveBaseAddressAsync(sourceUrl);
         string url = $"{baseAddress}{packageId.ToLowerInvariant()}/index.json";
-        using Stream stream = await GetStreamAsync(url);
-        VersionIndex? index = await NuGetApi.GetVersionIndexAsync(stream);
-        return (IReadOnlyList<string>?)index?.Versions ?? [];
+
+        try
+        {
+            using Stream stream = await GetStreamAsync(url);
+            VersionIndex? index = await NuGetApi.GetVersionIndexAsync(stream);
+            return (IReadOnlyList<string>?)index?.Versions ?? [];
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return [];
+        }
     }
 
     /// <summary>

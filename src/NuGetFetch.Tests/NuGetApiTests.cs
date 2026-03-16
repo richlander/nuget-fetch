@@ -121,7 +121,7 @@ public class NuGetApiTests
         Assert.Equal("Azure OpenAI client library", result.Data[0].Description);
         Assert.Equal(5_000_000, result.Data[0].TotalDownloads);
         Assert.True(result.Data[0].Verified);
-        Assert.Equal(2, result.Data[0].Versions.Count);
+        Assert.Equal(2, result.Data[0].Versions!.Count);
 
         Assert.Equal("Azure.AI.TextAnalytics", result.Data[1].Id);
         Assert.False(result.Data[2].Verified);

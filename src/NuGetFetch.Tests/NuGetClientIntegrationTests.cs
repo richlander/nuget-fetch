@@ -67,7 +67,7 @@ public class NuGetClientIntegrationTests : IDisposable
 
         // Verify it's a zip (PK header)
         byte[] header = new byte[4];
-        int read = await stream.ReadAsync(header);
+        int read = await stream.ReadAsync(header, TestContext.Current.CancellationToken);
         Assert.Equal(4, read);
         Assert.Equal((byte)'P', header[0]);
         Assert.Equal((byte)'K', header[1]);
