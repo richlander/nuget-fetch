@@ -1,6 +1,17 @@
 <Project>
   <PropertyGroup>
      <UseArtifactsOutput>true</UseArtifactsOutput>
-     <WarningsAsErrors>true</WarningsAsErrors>
+     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+     <Authors>Richard Lander</Authors>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <DebugType>embedded</DebugType>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(CI)' == 'true'">
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
   </PropertyGroup>
 </Project>

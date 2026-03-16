@@ -1,0 +1,70 @@
+name: Publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'CI workflow run ID to publish from'
+        required: true
+      confirm:
+        description: 'Type "publish" to confirm NuGet release'
+        required: true
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.confirm == 'publish'
+    environment: nuget-publish
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Download package from CI run
+        uses: actions/download-artifact@v8
+        with:
+          name: package
+          path: packages
+          run-id: ${{ github.event.inputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: List packages
+        run: ls -la packages/
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: NuGet login (OIDC → temp API key)
+        id: login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      - name: Publish to NuGet
+        run: |
+          for pkg in packages/*.nupkg; do
+            echo "Publishing: $(basename "$pkg")"
+            dotnet nuget push "$pkg" \
+              --api-key ${{ steps.login.outputs.NUGET_API_KEY }} \
+              --source https://api.nuget.org/v3/index.json \
+              --skip-duplicate
+          done
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=$(grep '<Version>' src/NuGetFetch/NuGetFetch.csproj | sed 's/.*<Version>\(.*\)<\/Version>.*/\1/')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        run: |
+          gh release create "v${{ steps.version.outputs.version }}" \
+            packages/*.nupkg \
+            --title "NuGetFetch ${{ steps.version.outputs.version }}" \
+            --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}
