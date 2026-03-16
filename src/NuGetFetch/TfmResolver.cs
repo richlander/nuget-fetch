@@ -232,7 +232,8 @@ public static class TfmResolver
             if (IsTfmLike(parts[i]) &&
                 i > 0 &&
                 (parts[i - 1].Equals("lib", StringComparison.OrdinalIgnoreCase) ||
-                 parts[i - 1].Equals("tools", StringComparison.OrdinalIgnoreCase)))
+                 parts[i - 1].Equals("tools", StringComparison.OrdinalIgnoreCase) ||
+                 parts[i - 1].Equals("ref", StringComparison.OrdinalIgnoreCase)))
             {
                 return parts[i];
             }
