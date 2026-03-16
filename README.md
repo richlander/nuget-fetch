@@ -2,7 +2,9 @@
 
 [![NuGet](https://img.shields.io/nuget/v/NuGetFetch)](https://www.nuget.org/packages/NuGetFetch)
 
-A lightweight NuGet client library for downloading and extracting NuGet packages. Designed for AOT compatibility with zero HttpClient ownership — bring your own.
+A lightweight NuGet client library for downloading and extracting
+NuGet packages. Designed for AOT compatibility with zero
+HttpClient ownership — bring your own.
 
 ```
 dotnet add package NuGetFetch
@@ -10,13 +12,13 @@ dotnet add package NuGetFetch
 
 ## Features
 
-- **Stream-based** — All JSON deserialization from streams, no string buffering
+- **Stream-based** — All JSON from streams, no string buffering
 - **AOT compatible** — STJ source generation, no reflection
-- **No HttpClient** — Accepts `HttpClient` from the caller; doesn't create or manage one
-- **Two-tier caching** — Reads from `~/.nuget/packages`, writes to app-specific cache
+- **No HttpClient** — Accepts `HttpClient` from the caller
+- **Two-tier caching** — Reads `~/.nuget/packages`, writes app cache
 - **Source resolution** — Parses `nuget.config` files (with credentials)
-- **TFM resolution** — Selects highest-priority target framework from extracted packages
-- **Version resolution** — Latest version, wildcard patterns, prerelease support
+- **TFM resolution** — Selects highest-priority target framework
+- **Version resolution** — Latest, wildcard patterns, prerelease
 - **Search** — Query nuget.org with prefix filtering
 
 ## Usage
@@ -53,7 +55,8 @@ IReadOnlyList<SearchResult> results = await search.SearchByPrefixAsync("Newtonso
 
 ### Caching
 
-Two-tier cache: reads from the global NuGet cache (`~/.nuget/packages`) and writes to an app-specific cache.
+Two-tier cache: reads from `~/.nuget/packages` and writes
+to an app-specific cache.
 
 ```csharp
 PackageCache cache = new("my-app");
@@ -94,26 +97,29 @@ PackageIdentity? parsed = PackageExtractor.ParsePackageReference("Newtonsoft.Jso
 
 ## API Overview
 
-| Class | Kind | Purpose |
-|-------|------|---------|
-| `NuGetClient` | Instance (takes `HttpClient`) | Versions, download, version patterns |
-| `SearchService` | Instance (takes `HttpClient`) | Search and prefix search |
-| `PackageCache` | Instance (takes `appName`) | Two-tier package cache |
-| `ResponseCache` | Instance (takes `appName`) | Disk cache with TTL and categories |
-| `PackageExtractor` | Static | Extract `.nupkg`, parse package specs |
-| `SourceResolver` | Static | Discover and parse `nuget.config` files |
-| `TfmResolver` | Static | Select best TFM from extracted packages |
-| `NuGetApi` | Static | Stream-based JSON deserialization |
+| Class              | Kind     | Purpose                    |
+| ------------------ | -------- | -------------------------- |
+| `NuGetClient`      | Instance | Versions, download         |
+| `SearchService`    | Instance | Search and prefix search   |
+| `PackageCache`     | Instance | Two-tier package cache     |
+| `ResponseCache`    | Instance | Disk cache with TTL        |
+| `PackageExtractor` | Static   | Extract `.nupkg`, parse    |
+| `SourceResolver`   | Static   | Parse `nuget.config` files |
+| `TfmResolver`      | Static   | Select best TFM            |
+| `NuGetApi`         | Static   | Stream JSON deserialization |
 
 ## Design
 
-Follows the [distroessed](https://github.com/richlander/distroessed) library patterns:
+Follows the [distroessed][1] library patterns:
+
+[1]: https://github.com/richlander/distroessed
 
 - **POCOs** — Records with primary constructors for all data models
-- **STJ source generation** — `NuGetJsonContext` for AOT-safe JSON serialization
-- **Stream-based helpers** — `NuGetApi` static class for stream deserialization
+- **STJ source generation** — `NuGetJsonContext` for AOT-safe JSON
+- **Stream-based helpers** — `NuGetApi` for stream deserialization
 - **No HttpClient ownership** — Library never creates an `HttpClient`
 
 ## Dependencies
 
-- [`NuGet.Versioning`](https://www.nuget.org/packages/NuGet.Versioning) — Version parsing and comparison
+- [`NuGet.Versioning`](https://www.nuget.org/packages/NuGet.Versioning)
+  — Version parsing and comparison

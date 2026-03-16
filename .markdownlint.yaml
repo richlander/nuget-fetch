@@ -1,0 +1,4 @@
+# Allow long lines in code blocks and tables
+MD013:
+  code_blocks: false
+  tables: false
