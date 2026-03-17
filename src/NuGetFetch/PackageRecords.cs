@@ -1,6 +1,6 @@
 namespace NuGetFetch;
 
-public record PackageIdentity(string Id, string Version);
+public record PackageIdentity(string Id, string? Version);
 
 public record PackageSource(string Name, string Url, PackageSourceCredential? Credential = null)
 {

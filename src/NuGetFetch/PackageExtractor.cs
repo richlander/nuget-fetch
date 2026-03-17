@@ -10,7 +10,7 @@ public static class PackageExtractor
     /// <summary>
     /// Extracts a .nupkg stream to a destination directory.
     /// </summary>
-    public static async Task<string> ExtractAsync(Stream nupkg, string destinationPath)
+    public static async Task<string> ExtractAsync(Stream nupkg, string destinationPath, CancellationToken cancellationToken = default)
     {
         Directory.CreateDirectory(destinationPath);
 
@@ -21,7 +21,7 @@ public static class PackageExtractor
         {
             using (FileStream temp = File.Create(tempFile))
             {
-                await nupkg.CopyToAsync(temp);
+                await nupkg.CopyToAsync(temp, cancellationToken).ConfigureAwait(false);
             }
 
             ZipFile.ExtractToDirectory(tempFile, destinationPath, overwriteFiles: true);
@@ -58,7 +58,7 @@ public static class PackageExtractor
 
         if (atIndex < 0)
         {
-            return new PackageIdentity(spec.Trim(), string.Empty);
+            return new PackageIdentity(spec.Trim(), null);
         }
 
         string id = spec[..atIndex].Trim();

@@ -8,16 +8,18 @@ public static class TfmResolver
 {
     /// <summary>
     /// Resolves the best assembly path for a specific or auto-selected TFM.
-    /// Returns the path to the TFM directory, or null if not found.
+    /// When <paramref name="targetTfm"/> is provided, selects the highest-priority
+    /// compatible TFM (priority &lt;= target). Returns the path to the TFM directory,
+    /// or null if not found.
     /// </summary>
-    public static string? ResolvePackagePath(string extractedPath, string? tfm = null)
+    public static string? ResolvePackagePath(string extractedPath, string? tfm = null, string? targetTfm = null)
     {
         if (tfm is not null)
         {
             return FindByTfm(extractedPath, tfm);
         }
 
-        return FindHighestTfm(extractedPath);
+        return FindHighestTfm(extractedPath, targetTfm);
     }
 
     /// <summary>
@@ -171,8 +173,9 @@ public static class TfmResolver
         return null;
     }
 
-    private static string? FindHighestTfm(string extractedPath)
+    private static string? FindHighestTfm(string extractedPath, string? targetTfm = null)
     {
+        int maxPriority = targetTfm is not null ? GetTfmPriority(targetTfm) : int.MaxValue;
         string? bestPath = null;
         int bestPriority = -1;
 
@@ -190,7 +193,7 @@ public static class TfmResolver
                 string tfmName = Path.GetFileName(tfmDir);
                 int priority = GetTfmPriority(tfmName);
 
-                if (priority > bestPriority)
+                if (priority > bestPriority && priority <= maxPriority)
                 {
                     bestPriority = priority;
                     bestPath = tfmDir;
@@ -243,8 +246,13 @@ public static class TfmResolver
     }
 
     /// <summary>
-    /// Checks if a string looks like a TFM (starts with "net").
+    /// Checks if a string looks like a TFM (starts with "net" followed by a digit,
+    /// or is a known TFM prefix like "netcoreapp" or "netstandard").
     /// </summary>
     public static bool IsTfmLike(string name) =>
-        name.StartsWith("net", StringComparison.OrdinalIgnoreCase);
+        name.StartsWith("net", StringComparison.OrdinalIgnoreCase)
+        && name.Length >= 4
+        && (char.IsAsciiDigit(name[3])
+            || name.StartsWith("netcoreapp", StringComparison.OrdinalIgnoreCase)
+            || name.StartsWith("netstandard", StringComparison.OrdinalIgnoreCase));
 }

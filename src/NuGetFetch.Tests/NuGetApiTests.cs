@@ -15,7 +15,7 @@ public class NuGetApiTests
     {
         string json = """{"versions":["1.0.0","2.0.0","3.0.0-preview.1"]}""";
         using var stream = new MemoryStream(Encoding.UTF8.GetBytes(json));
-        var result = await NuGetApi.GetVersionIndexAsync(stream);
+        var result = await NuGetApi.GetVersionIndexAsync(stream, TestContext.Current.CancellationToken);
         Assert.NotNull(result);
         Assert.Equal(3, result.Versions.Count);
         Assert.Equal("1.0.0", result.Versions[0]);
@@ -27,7 +27,7 @@ public class NuGetApiTests
     {
         string json = """{"versions":[]}""";
         using var stream = new MemoryStream(Encoding.UTF8.GetBytes(json));
-        var result = await NuGetApi.GetVersionIndexAsync(stream);
+        var result = await NuGetApi.GetVersionIndexAsync(stream, TestContext.Current.CancellationToken);
         Assert.NotNull(result);
         Assert.Empty(result.Versions);
     }
@@ -44,7 +44,7 @@ public class NuGetApiTests
         }
         """;
         using var stream = new MemoryStream(Encoding.UTF8.GetBytes(json));
-        var result = await NuGetApi.GetServiceIndexAsync(stream);
+        var result = await NuGetApi.GetServiceIndexAsync(stream, TestContext.Current.CancellationToken);
         Assert.NotNull(result);
         Assert.Single(result.Resources);
         Assert.Equal("PackageBaseAddress/3.0.0", result.Resources[0].Type);
@@ -64,7 +64,7 @@ public class NuGetApiTests
         }
         """;
         using var stream = new MemoryStream(Encoding.UTF8.GetBytes(json));
-        var result = await NuGetApi.GetServiceIndexAsync(stream);
+        var result = await NuGetApi.GetServiceIndexAsync(stream, TestContext.Current.CancellationToken);
         Assert.NotNull(result);
         var packageBase = result.Resources.FirstOrDefault(r => r.Type.StartsWith("PackageBaseAddress"));
         Assert.NotNull(packageBase);
@@ -111,7 +111,7 @@ public class NuGetApiTests
         }
         """;
         using var stream = new MemoryStream(Encoding.UTF8.GetBytes(json));
-        var result = await NuGetApi.GetSearchResponseAsync(stream);
+        var result = await NuGetApi.GetSearchResponseAsync(stream, TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         Assert.Equal(3, result.Data.Count);
@@ -132,7 +132,7 @@ public class NuGetApiTests
     {
         string json = """{"totalHits":0,"data":[]}""";
         using var stream = new MemoryStream(Encoding.UTF8.GetBytes(json));
-        var result = await NuGetApi.GetSearchResponseAsync(stream);
+        var result = await NuGetApi.GetSearchResponseAsync(stream, TestContext.Current.CancellationToken);
         Assert.NotNull(result);
         Assert.Empty(result.Data);
     }
@@ -151,7 +151,7 @@ public class NuGetApiTests
         }
         """;
         using var stream = new MemoryStream(Encoding.UTF8.GetBytes(json));
-        var result = await NuGetApi.GetSearchResponseAsync(stream);
+        var result = await NuGetApi.GetSearchResponseAsync(stream, TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         Assert.Single(result.Data);
@@ -166,7 +166,7 @@ public class NuGetApiTests
     public async Task GetSearchResponseAsync_MalformedJson_ReturnsNull()
     {
         using var stream = new MemoryStream(Encoding.UTF8.GetBytes("not json"));
-        var result = await NuGetApi.GetSearchResponseAsync(stream);
+        var result = await NuGetApi.GetSearchResponseAsync(stream, TestContext.Current.CancellationToken);
         Assert.Null(result);
     }
 
@@ -174,7 +174,7 @@ public class NuGetApiTests
     public async Task GetVersionIndexAsync_MalformedJson_ReturnsNull()
     {
         using var stream = new MemoryStream(Encoding.UTF8.GetBytes("{broken"));
-        var result = await NuGetApi.GetVersionIndexAsync(stream);
+        var result = await NuGetApi.GetVersionIndexAsync(stream, TestContext.Current.CancellationToken);
         Assert.Null(result);
     }
 }

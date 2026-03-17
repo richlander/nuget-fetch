@@ -5,11 +5,11 @@ namespace NuGetFetch;
 
 public static class NuGetApi
 {
-    public static async ValueTask<ServiceIndex?> GetServiceIndexAsync(Stream json)
+    public static async ValueTask<ServiceIndex?> GetServiceIndexAsync(Stream json, CancellationToken cancellationToken = default)
     {
         try
         {
-            return await JsonSerializer.DeserializeAsync(json, NuGetJsonContext.Default.ServiceIndex);
+            return await JsonSerializer.DeserializeAsync(json, NuGetJsonContext.Default.ServiceIndex, cancellationToken).ConfigureAwait(false);
         }
         catch (JsonException)
         {
@@ -17,11 +17,11 @@ public static class NuGetApi
         }
     }
 
-    public static async ValueTask<VersionIndex?> GetVersionIndexAsync(Stream json)
+    public static async ValueTask<VersionIndex?> GetVersionIndexAsync(Stream json, CancellationToken cancellationToken = default)
     {
         try
         {
-            return await JsonSerializer.DeserializeAsync(json, NuGetJsonContext.Default.VersionIndex);
+            return await JsonSerializer.DeserializeAsync(json, NuGetJsonContext.Default.VersionIndex, cancellationToken).ConfigureAwait(false);
         }
         catch (JsonException)
         {
@@ -29,11 +29,11 @@ public static class NuGetApi
         }
     }
 
-    public static async ValueTask<SearchResponse?> GetSearchResponseAsync(Stream json)
+    public static async ValueTask<SearchResponse?> GetSearchResponseAsync(Stream json, CancellationToken cancellationToken = default)
     {
         try
         {
-            return await JsonSerializer.DeserializeAsync(json, NuGetJsonContext.Default.SearchResponse);
+            return await JsonSerializer.DeserializeAsync(json, NuGetJsonContext.Default.SearchResponse, cancellationToken).ConfigureAwait(false);
         }
         catch (JsonException)
         {
