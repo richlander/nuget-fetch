@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <LangVersion>13</LangVersion>
     <IsAotCompatible>true</IsAotCompatible>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -17,6 +17,12 @@
 
   <ItemGroup>
     <PackageReference Include="NuGet.Versioning" Version="7.0.1" />
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="9.0.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="trustedroots/codesignctl.pem" LogicalName="codesignctl.pem" />
+    <EmbeddedResource Include="trustedroots/timestampctl.pem" LogicalName="timestampctl.pem" />
   </ItemGroup>
 
 </Project>
