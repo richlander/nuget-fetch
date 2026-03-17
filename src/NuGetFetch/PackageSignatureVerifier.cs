@@ -85,6 +85,15 @@ public static class PackageSignatureVerifier
                 $"Package signature integrity check failed: {ex.Message}");
         }
 
+        // Parse the signed content hash for transparency.
+        // The CMS ContentInfo contains "Version:1\n\n{OID}-Hash:{base64}\n\n".
+        // CheckSignature above cryptographically verifies this content was signed
+        // by the certificate holder. Full content hash verification (comparing this
+        // hash against the actual package bytes) requires implementing NuGet's
+        // SignedPackageArchiveUtility ZIP hashing algorithm, which manipulates raw
+        // ZIP bytes — not implemented in this lightweight client.
+        string? signedContentHash = TryExtractSignedHash(signedCms.ContentInfo.Content);
+
         // Extract the signing certificate
         if (signedCms.SignerInfos.Count == 0)
         {
@@ -126,7 +135,41 @@ public static class PackageSignatureVerifier
             Thumbprint = thumbprint,
             SignatureType = signatureType,
             Timestamp = timestamp,
+            ContentHash = signedContentHash,
         };
+    }
+
+    /// <summary>
+    /// Parses the NuGet-specific signed content format to extract the package hash.
+    /// Format: "Version:1\n\n{OID}-Hash:{base64Hash}\n\n"
+    /// </summary>
+    private static string? TryExtractSignedHash(byte[]? content)
+    {
+        if (content is null || content.Length == 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            string text = System.Text.Encoding.UTF8.GetString(content);
+            const string hashMarker = "-Hash:";
+            int hashStart = text.IndexOf(hashMarker, StringComparison.Ordinal);
+
+            if (hashStart < 0)
+            {
+                return null;
+            }
+
+            hashStart += hashMarker.Length;
+            int hashEnd = text.IndexOf('\n', hashStart);
+
+            return hashEnd < 0 ? text[hashStart..].Trim() : text[hashStart..hashEnd].Trim();
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     /// <summary>
@@ -344,4 +387,11 @@ public record SignatureVerificationResult(SignatureStatus Status, string? Reason
 
     /// <summary>RFC 3161 timestamp from the counter-signature, if present and valid.</summary>
     public DateTimeOffset? Timestamp { get; init; }
+
+    /// <summary>
+    /// Base64-encoded content hash from the signed data.
+    /// This is the hash the signer committed to. Full content hash verification
+    /// (comparing against actual package bytes) requires NuGet's ZIP hashing algorithm.
+    /// </summary>
+    public string? ContentHash { get; init; }
 }
