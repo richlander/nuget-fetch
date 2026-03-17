@@ -299,4 +299,64 @@ public class TfmResolverTests
         Assert.True(TfmResolver.GetTfmPriority(preferred) > TfmResolver.GetTfmPriority(fallback),
             $"Expected {preferred} > {fallback}");
     }
+
+    // --- TFM family detection ---
+
+    [Theory]
+    [InlineData("net8.0", TfmFamily.NetModern)]
+    [InlineData("net6.0", TfmFamily.NetModern)]
+    [InlineData("net5.0", TfmFamily.NetModern)]
+    [InlineData("net10.0", TfmFamily.NetModern)]
+    [InlineData("netcoreapp3.1", TfmFamily.NetCore)]
+    [InlineData("netcoreapp2.1", TfmFamily.NetCore)]
+    [InlineData("netstandard2.0", TfmFamily.NetStandard)]
+    [InlineData("netstandard1.0", TfmFamily.NetStandard)]
+    [InlineData("net481", TfmFamily.NetFramework)]
+    [InlineData("net45", TfmFamily.NetFramework)]
+    [InlineData("net461", TfmFamily.NetFramework)]
+    [InlineData("unknown", TfmFamily.Unknown)]
+    public void GetTfmFamily_ReturnsCorrectFamily(string tfm, TfmFamily expected)
+    {
+        Assert.Equal(expected, TfmResolver.GetTfmFamily(tfm));
+    }
+
+    // --- Cross-family compatibility ---
+
+    [Theory]
+    [InlineData("netstandard2.0", "net8.0", true)]
+    [InlineData("netstandard2.0", "net481", true)]
+    [InlineData("netstandard2.0", "netcoreapp3.1", true)]
+    [InlineData("net6.0", "net8.0", true)]
+    [InlineData("netcoreapp3.1", "net8.0", true)]
+    [InlineData("net481", "net8.0", false)]   // .NET Framework not compatible with modern .NET
+    [InlineData("net8.0", "net481", false)]   // Modern .NET not compatible with .NET Framework
+    [InlineData("net45", "net6.0", false)]    // .NET Framework not compatible with modern .NET
+    [InlineData("net461", "netcoreapp3.1", false)]  // .NET Framework not compatible with .NET Core
+    public void IsTfmCompatible_ReturnsCorrectResult(string candidate, string target, bool expected)
+    {
+        Assert.Equal(expected, TfmResolver.IsTfmCompatible(candidate, target));
+    }
+
+    [Fact]
+    public void ResolvePackagePath_WithTargetTfm_RejectsIncompatibleFamily()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), $"nf-tfm-{Guid.NewGuid():N}");
+        try
+        {
+            // Package has both net481 and netstandard2.0
+            Directory.CreateDirectory(Path.Combine(dir, "lib", "net481"));
+            File.WriteAllBytes(Path.Combine(dir, "lib", "net481", "Test.dll"), [0]);
+            Directory.CreateDirectory(Path.Combine(dir, "lib", "netstandard2.0"));
+            File.WriteAllBytes(Path.Combine(dir, "lib", "netstandard2.0", "Test.dll"), [0]);
+
+            // Targeting net8.0 should pick netstandard2.0, NOT net481
+            string? result = TfmResolver.ResolvePackagePath(dir, targetTfm: "net8.0");
+            Assert.NotNull(result);
+            Assert.Contains("netstandard2.0", result);
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, true);
+        }
+    }
 }

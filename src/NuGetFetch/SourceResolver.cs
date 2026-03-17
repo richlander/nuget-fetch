@@ -12,7 +12,8 @@ public static class SourceResolver
 
     /// <summary>
     /// Resolves NuGet sources in priority order.
-    /// Config files are merged nearest-first: a &lt;clear/&gt; in a project-level
+    /// Config files are processed most-distant first (machine → user → project-level),
+    /// matching the official NuGet client semantics. A &lt;clear/&gt; in a project-level
     /// config clears sources accumulated from parent directories.
     /// </summary>
     public static IReadOnlyList<PackageSource> ResolveSources(
@@ -26,7 +27,7 @@ public static class SourceResolver
             return [new PackageSource("explicit", explicitSource)];
         }
 
-        // Merge sources across all config files (nearest-first)
+        // Merge sources across all config files (most-distant first, so nearest wins)
         Dictionary<string, string> mergedSources = [];
         HashSet<string> disabled = [];
         Dictionary<string, PackageSourceCredential> credentials = [];
@@ -35,9 +36,11 @@ public static class SourceResolver
             ? [configPath]
             : FindConfigFiles();
 
-        foreach (string file in configFiles)
+        // FindConfigFiles returns nearest-first; reverse to process most-distant first
+        // so that <clear/> in a nearer config properly resets distant sources
+        for (int i = configFiles.Count - 1; i >= 0; i--)
         {
-            MergeConfigFile(file, mergedSources, disabled, credentials);
+            MergeConfigFile(configFiles[i], mergedSources, disabled, credentials);
         }
 
         // Build result (skip disabled sources)

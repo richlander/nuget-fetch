@@ -38,7 +38,7 @@ public class PackageCache
     public string? TryGet(string id, string version)
     {
         string normalizedId = id.ToLowerInvariant();
-        string normalizedVersion = version.ToLowerInvariant();
+        string normalizedVersion = NuGetClient.NormalizeVersion(version);
 
         // Check NuGet global cache (read-only)
         if (!_skipNuGetCache)
@@ -70,7 +70,7 @@ public class PackageCache
     public string? Cache(string id, string version, string sourcePath)
     {
         string normalizedId = id.ToLowerInvariant();
-        string normalizedVersion = version.ToLowerInvariant();
+        string normalizedVersion = NuGetClient.NormalizeVersion(version);
         string targetPath = Path.Combine(_appCacheBase, normalizedId, normalizedVersion);
 
         if (Directory.Exists(targetPath))
@@ -106,7 +106,7 @@ public class PackageCache
     /// Gets the path where a package would be cached.
     /// </summary>
     public string GetCachePath(string id, string version) =>
-        Path.Combine(_appCacheBase, id.ToLowerInvariant(), version.ToLowerInvariant());
+        Path.Combine(_appCacheBase, id.ToLowerInvariant(), NuGetClient.NormalizeVersion(version));
 
     /// <summary>
     /// Finds the latest cached version of a package across both caches.

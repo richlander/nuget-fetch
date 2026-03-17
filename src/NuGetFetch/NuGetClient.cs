@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net.Http.Headers;
 using NuGet.Versioning;
 
@@ -12,18 +13,30 @@ public class NuGetClient(HttpClient client)
     internal const string NuGetOrgServiceIndex = "https://api.nuget.org/v3/index.json";
     internal const string NuGetOrgSearchUrl = "https://azuresearch-usnc.nuget.org/query";
 
+    private readonly ConcurrentDictionary<string, string> _baseAddressCache = new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>
     /// Gets all available versions for a package from a NuGet source.
     /// Returns empty list if the package does not exist.
     /// </summary>
-    public async Task<IReadOnlyList<string>> GetVersionsAsync(string packageId, string? sourceUrl = null, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<string>> GetVersionsAsync(string packageId, string? sourceUrl = null, PackageSourceCredential? credential = null, CancellationToken cancellationToken = default)
     {
         string baseAddress = await ResolveBaseAddressAsync(sourceUrl, cancellationToken).ConfigureAwait(false);
         string url = $"{baseAddress}{packageId.ToLowerInvariant()}/index.json";
 
         try
         {
-            using Stream stream = await client.GetStreamAsync(url, cancellationToken).ConfigureAwait(false);
+            using HttpRequestMessage request = new(HttpMethod.Get, url);
+            ApplyCredential(request, credential);
+            using HttpResponseMessage response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                return [];
+            }
+
+            response.EnsureSuccessStatusCode();
+            using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
             VersionIndex? index = await NuGetApi.GetVersionIndexAsync(stream, cancellationToken).ConfigureAwait(false);
             return (IReadOnlyList<string>?)index?.Versions ?? [];
         }
@@ -36,7 +49,7 @@ public class NuGetClient(HttpClient client)
     /// <summary>
     /// Gets the latest version for a package. Uses the search API for nuget.org (faster).
     /// </summary>
-    public async Task<string?> GetLatestVersionAsync(string packageId, bool includePrerelease = false, string? sourceUrl = null, CancellationToken cancellationToken = default)
+    public async Task<string?> GetLatestVersionAsync(string packageId, bool includePrerelease = false, string? sourceUrl = null, PackageSourceCredential? credential = null, CancellationToken cancellationToken = default)
     {
         // For nuget.org, use the search API (faster than listing all versions)
         if (sourceUrl is null || IsNuGetOrg(sourceUrl))
@@ -45,7 +58,7 @@ public class NuGetClient(HttpClient client)
         }
 
         // For other sources, list all versions and pick the latest
-        IReadOnlyList<string> versions = await GetVersionsAsync(packageId, sourceUrl, cancellationToken).ConfigureAwait(false);
+        IReadOnlyList<string> versions = await GetVersionsAsync(packageId, sourceUrl, credential, cancellationToken).ConfigureAwait(false);
         return FindLatestVersion(versions, includePrerelease);
     }
 
@@ -58,7 +71,7 @@ public class NuGetClient(HttpClient client)
         {
             try
             {
-                string? version = await GetLatestVersionAsync(packageId, includePrerelease, source.Url, cancellationToken).ConfigureAwait(false);
+                string? version = await GetLatestVersionAsync(packageId, includePrerelease, source.Url, source.Credential, cancellationToken).ConfigureAwait(false);
                 if (version is not null)
                 {
                     return version;
@@ -81,17 +94,11 @@ public class NuGetClient(HttpClient client)
     {
         string baseAddress = await ResolveBaseAddressAsync(sourceUrl, cancellationToken).ConfigureAwait(false);
         string id = packageId.ToLowerInvariant();
-        string ver = version.ToLowerInvariant();
+        string ver = NormalizeVersion(version);
         string url = $"{baseAddress}{id}/{ver}/{id}.{ver}.nupkg";
 
         HttpRequestMessage request = new(HttpMethod.Get, url);
-
-        if (credential is not null)
-        {
-            string encoded = Convert.ToBase64String(
-                System.Text.Encoding.ASCII.GetBytes($"{credential.Username}:{credential.Password}"));
-            request.Headers.Authorization = new AuthenticationHeaderValue("Basic", encoded);
-        }
+        ApplyCredential(request, credential);
 
         HttpResponseMessage response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
 
@@ -142,9 +149,9 @@ public class NuGetClient(HttpClient client)
     /// <summary>
     /// Resolves versions matching a wildcard pattern (e.g., "11.0.0-preview*").
     /// </summary>
-    public async Task<string?> ResolveVersionPatternAsync(string packageId, string pattern, string? sourceUrl = null, CancellationToken cancellationToken = default)
+    public async Task<string?> ResolveVersionPatternAsync(string packageId, string pattern, string? sourceUrl = null, PackageSourceCredential? credential = null, CancellationToken cancellationToken = default)
     {
-        IReadOnlyList<string> versions = await GetVersionsAsync(packageId, sourceUrl, cancellationToken).ConfigureAwait(false);
+        IReadOnlyList<string> versions = await GetVersionsAsync(packageId, sourceUrl, credential, cancellationToken).ConfigureAwait(false);
 
         string prefix = pattern.TrimEnd('*');
         NuGetVersion? best = null;
@@ -167,7 +174,7 @@ public class NuGetClient(HttpClient client)
     private async Task<string?> GetLatestVersionFromSearchAsync(string packageId, bool includePrerelease, CancellationToken cancellationToken)
     {
         string prerelease = includePrerelease ? "true" : "false";
-        string url = $"{NuGetOrgSearchUrl}?q=packageid:{packageId}&take=1&prerelease={prerelease}";
+        string url = $"{NuGetOrgSearchUrl}?q=packageid:{Uri.EscapeDataString(packageId)}&take=1&prerelease={prerelease}";
         using Stream stream = await client.GetStreamAsync(url, cancellationToken).ConfigureAwait(false);
         SearchResponse? response = await NuGetApi.GetSearchResponseAsync(stream, cancellationToken).ConfigureAwait(false);
         return response?.Data.FirstOrDefault()?.Version;
@@ -180,8 +187,16 @@ public class NuGetClient(HttpClient client)
             return NuGetOrgFlatContainer;
         }
 
-        return await GetPackageBaseAddressAsync(sourceUrl, cancellationToken).ConfigureAwait(false)
+        if (_baseAddressCache.TryGetValue(sourceUrl, out string? cached))
+        {
+            return cached;
+        }
+
+        string baseAddress = await GetPackageBaseAddressAsync(sourceUrl, cancellationToken).ConfigureAwait(false)
             ?? throw new InvalidOperationException($"Could not resolve PackageBaseAddress from {sourceUrl}");
+
+        _baseAddressCache.TryAdd(sourceUrl, baseAddress);
+        return baseAddress;
     }
 
     private static bool IsNuGetOrg(string url)
@@ -196,6 +211,16 @@ public class NuGetClient(HttpClient client)
         }
 
         return false;
+    }
+
+    private static void ApplyCredential(HttpRequestMessage request, PackageSourceCredential? credential)
+    {
+        if (credential is not null)
+        {
+            string encoded = Convert.ToBase64String(
+                System.Text.Encoding.ASCII.GetBytes($"{credential.Username}:{credential.Password}"));
+            request.Headers.Authorization = new AuthenticationHeaderValue("Basic", encoded);
+        }
     }
 
     internal static string? FindLatestVersion(IReadOnlyList<string> versions, bool includePrerelease)
@@ -219,6 +244,20 @@ public class NuGetClient(HttpClient client)
         }
 
         return best?.OriginalVersion;
+    }
+
+    /// <summary>
+    /// Normalizes a version string using NuGet versioning rules.
+    /// Falls back to lowercasing if the version string can't be parsed.
+    /// </summary>
+    public static string NormalizeVersion(string version)
+    {
+        if (NuGetVersion.TryParse(version, out NuGetVersion? parsed))
+        {
+            return parsed.ToNormalizedString().ToLowerInvariant();
+        }
+
+        return version.ToLowerInvariant();
     }
 }
 
