@@ -109,4 +109,16 @@ public class NuGetClientIntegrationTests : IDisposable
         string? version = await _client.GetLatestVersionAsync("Newtonsoft.Json", sources, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotNull(version);
     }
+
+    [Theory]
+    [InlineData("1.0.0", "1.0.0")]
+    [InlineData("1.0.0.0", "1.0.0")]
+    [InlineData("01.00.00", "1.0.0")]
+    [InlineData("13.0.3", "13.0.3")]
+    [InlineData("9.0.0-preview.1", "9.0.0-preview.1")]
+    [InlineData("not-a-version", "not-a-version")]
+    public void NormalizeVersion_ReturnsExpected(string input, string expected)
+    {
+        Assert.Equal(expected, NuGetClient.NormalizeVersion(input));
+    }
 }

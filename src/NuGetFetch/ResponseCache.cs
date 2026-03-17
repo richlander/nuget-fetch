@@ -143,7 +143,11 @@ public class ResponseCache
                 Directory.CreateDirectory(dir);
             }
 
-            File.WriteAllText(path, content);
+            // Atomic write: write to temp file, then move into place
+            string tempPath = path + $".tmp-{Guid.NewGuid():N}";
+            File.WriteAllText(tempPath, content);
+
+            File.Move(tempPath, path, overwrite: true);
         }
         catch
         {
@@ -167,7 +171,11 @@ public class ResponseCache
                 Directory.CreateDirectory(dir);
             }
 
-            File.WriteAllBytes(path, content);
+            // Atomic write: write to temp file, then move into place
+            string tempPath = path + $".tmp-{Guid.NewGuid():N}";
+            File.WriteAllBytes(tempPath, content);
+
+            File.Move(tempPath, path, overwrite: true);
         }
         catch
         {
