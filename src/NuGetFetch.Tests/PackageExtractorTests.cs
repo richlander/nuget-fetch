@@ -25,7 +25,7 @@ public class PackageExtractorTests
         var result = PackageExtractor.ParsePackageReference(spec);
         Assert.NotNull(result);
         Assert.Equal(expectedId, result.Id);
-        Assert.Equal(string.Empty, result.Version);
+        Assert.Null(result.Version);
     }
 
     [Theory]
@@ -119,7 +119,7 @@ public class PackageExtractorTests
             System.IO.Compression.ZipFile.CreateFromDirectory(dir + "-src", zipFile);
 
             using var stream = File.OpenRead(zipFile);
-            string result = await PackageExtractor.ExtractAsync(stream, dir);
+            string result = await PackageExtractor.ExtractAsync(stream, dir, TestContext.Current.CancellationToken);
 
             Assert.Equal(dir, result);
             Assert.True(File.Exists(Path.Combine(dir, "test.nuspec")));

@@ -64,6 +64,7 @@ public class PackageCache
 
     /// <summary>
     /// Caches an extracted package in the app cache directory.
+    /// Uses atomic directory rename to prevent partial-copy races.
     /// Returns the cache path, or null on failure.
     /// </summary>
     public string? Cache(string id, string version, string sourcePath)
@@ -79,13 +80,24 @@ public class PackageCache
 
         try
         {
-            CopyDirectory(sourcePath, targetPath);
+            // Copy to a temp directory first, then atomically move into place
+            string tempPath = targetPath + $".tmp-{Guid.NewGuid():N}";
+            CopyDirectory(sourcePath, tempPath);
+
+            try
+            {
+                Directory.Move(tempPath, targetPath);
+            }
+            catch (IOException) when (Directory.Exists(targetPath))
+            {
+                // Another process won the race — use their copy
+                try { Directory.Delete(tempPath, recursive: true); } catch { }
+            }
+
             return targetPath;
         }
         catch
         {
-            // Clean up partial copy
-            try { Directory.Delete(targetPath, recursive: true); } catch { }
             return null;
         }
     }

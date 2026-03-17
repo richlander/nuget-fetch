@@ -22,7 +22,7 @@ public class SearchServiceIntegrationTests : IDisposable
     [Fact]
     public async Task SearchAsync_ReturnsResults()
     {
-        var results = await _search.SearchAsync("Newtonsoft.Json", take: 3);
+        var results = await _search.SearchAsync("Newtonsoft.Json", take: 3, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotEmpty(results);
         Assert.Equal("Newtonsoft.Json", results[0].Id);
     }
@@ -30,14 +30,14 @@ public class SearchServiceIntegrationTests : IDisposable
     [Fact]
     public async Task SearchAsync_EmptyQuery_ReturnsResults()
     {
-        var results = await _search.SearchAsync("", take: 5);
+        var results = await _search.SearchAsync("", take: 5, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotEmpty(results);
     }
 
     [Fact]
     public async Task SearchByPrefixAsync_FiltersByPrefix()
     {
-        var results = await _search.SearchByPrefixAsync("Humanizer", take: 10);
+        var results = await _search.SearchByPrefixAsync("Humanizer", take: 10, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotEmpty(results);
         Assert.All(results, r =>
             Assert.StartsWith("Humanizer", r.Id, StringComparison.OrdinalIgnoreCase));
@@ -46,7 +46,7 @@ public class SearchServiceIntegrationTests : IDisposable
     [Fact]
     public async Task SearchAsync_ResultHasMetadata()
     {
-        var results = await _search.SearchAsync("Newtonsoft.Json", take: 1);
+        var results = await _search.SearchAsync("Newtonsoft.Json", take: 1, cancellationToken: TestContext.Current.CancellationToken);
         Assert.NotEmpty(results);
         var first = results[0];
         Assert.NotNull(first.Id);
