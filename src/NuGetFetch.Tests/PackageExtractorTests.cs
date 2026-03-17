@@ -131,4 +131,30 @@ public class PackageExtractorTests
             if (File.Exists(zipFile)) File.Delete(zipFile);
         }
     }
+
+    [Fact]
+    public async Task ExtractAsync_ZipSlipEntry_Throws()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), $"nf-zipslip-{Guid.NewGuid():N}");
+        string zipFile = Path.Combine(Path.GetTempPath(), $"nf-zipslip-{Guid.NewGuid():N}.zip");
+        try
+        {
+            // Create a zip with a path traversal entry
+            using (var archive = System.IO.Compression.ZipFile.Open(zipFile, System.IO.Compression.ZipArchiveMode.Create))
+            {
+                var entry = archive.CreateEntry("../../../etc/evil.txt");
+                using var writer = new StreamWriter(entry.Open());
+                writer.Write("malicious");
+            }
+
+            using var stream = File.OpenRead(zipFile);
+            await Assert.ThrowsAsync<InvalidDataException>(() =>
+                PackageExtractor.ExtractAsync(stream, dir, TestContext.Current.CancellationToken));
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, true);
+            if (File.Exists(zipFile)) File.Delete(zipFile);
+        }
+    }
 }

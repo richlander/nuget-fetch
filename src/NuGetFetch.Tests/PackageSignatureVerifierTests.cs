@@ -104,6 +104,27 @@ public class PackageSignatureVerifierTests : IDisposable
     }
 
     [Fact]
+    public async Task VerifyPackage_SignedPackage_HasContentHash()
+    {
+        string nupkgPath = await DownloadPackageAsync("Newtonsoft.Json", "13.0.3");
+        try
+        {
+            var result = PackageSignatureVerifier.VerifyPackage(nupkgPath);
+
+            Assert.True(result.IsValid);
+            Assert.NotNull(result.ContentHash);
+            Assert.NotEmpty(result.ContentHash);
+            // Should be valid base64
+            byte[] decoded = Convert.FromBase64String(result.ContentHash);
+            Assert.Equal(32, decoded.Length); // SHA-256 = 32 bytes
+        }
+        finally
+        {
+            File.Delete(nupkgPath);
+        }
+    }
+
+    [Fact]
     public void VerifyPackage_UnsignedPackage_ReturnsUnsigned()
     {
         // Create a minimal zip with no .signature.p7s
