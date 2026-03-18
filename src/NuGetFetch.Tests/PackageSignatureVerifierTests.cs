@@ -213,6 +213,47 @@ public class PackageSignatureVerifierTests : IDisposable
         Assert.NotEmpty(roots);
     }
 
+    [Fact]
+    public async Task VerifyPackage_AuthorSignedPackage_HasRepositoryCounterSignature()
+    {
+        // Newtonsoft.Json is author-signed; nuget.org adds a repository counter-signature
+        string nupkgPath = await DownloadPackageAsync("Newtonsoft.Json", "13.0.3");
+        try
+        {
+            var result = PackageSignatureVerifier.VerifyPackage(nupkgPath);
+
+            Assert.True(result.IsValid);
+            Assert.Equal(SignatureType.Author, result.SignatureType);
+            Assert.NotNull(result.CounterSignature);
+            Assert.True(result.CounterSignature.IsValid);
+            Assert.Equal(SignatureType.Repository, result.CounterSignature.SignatureType);
+            Assert.NotNull(result.CounterSignature.Publisher);
+        }
+        finally
+        {
+            File.Delete(nupkgPath);
+        }
+    }
+
+    [Fact]
+    public async Task VerifyPackage_RepositorySignedPackage_HasNoCounterSignature()
+    {
+        // dotnet-install is repository-signed only (no author signature)
+        string nupkgPath = await DownloadPackageAsync("dotnet-install", "0.1.1");
+        try
+        {
+            var result = PackageSignatureVerifier.VerifyPackage(nupkgPath);
+
+            Assert.True(result.IsValid);
+            Assert.Equal(SignatureType.Repository, result.SignatureType);
+            Assert.Null(result.CounterSignature);
+        }
+        finally
+        {
+            File.Delete(nupkgPath);
+        }
+    }
+
     private async Task<string> DownloadPackageAsync(string id, string version)
     {
         string path = Path.Combine(Path.GetTempPath(), $"{id}.{version}.nupkg");
