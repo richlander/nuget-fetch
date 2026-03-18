@@ -136,6 +136,9 @@ public static class PackageSignatureVerifier
             SignatureType = signatureType,
             Timestamp = timestamp,
             ContentHash = signedContentHash,
+            CounterSignature = signatureType == SignatureType.Author
+                ? VerifyRepositoryCounterSignature(signerInfo, signedCms.Certificates)
+                : null,
         };
     }
 
@@ -232,6 +235,46 @@ public static class PackageSignatureVerifier
                 if (ts.HasValue)
                     return ts;
             }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Extracts and verifies the repository counter-signature from an author-signed package.
+    /// The counter-signature is a standard PKCS#9 counter-signer with a repository commitment type.
+    /// </summary>
+    private static SignatureVerificationResult? VerifyRepositoryCounterSignature(
+        SignerInfo primarySigner, X509Certificate2Collection extraCerts)
+    {
+        foreach (SignerInfo counterSigner in primarySigner.CounterSignerInfos)
+        {
+            SignatureType counterType = DetectSignatureType(counterSigner);
+            if (counterType != SignatureType.Repository)
+                continue;
+
+            X509Certificate2? cert = counterSigner.Certificate;
+            if (cert is null)
+                continue;
+
+            string? publisher = ExtractCN(cert.Subject);
+            string thumbprint = cert.GetCertHashString(HashAlgorithmName.SHA256);
+            DateTimeOffset? timestamp = VerifyTimestamp(counterSigner);
+
+            SignatureVerificationResult chainResult = VerifyCertificateChain(
+                cert, extraCerts, TrustedRoots.CodeSigningRoots,
+                verificationTime: timestamp);
+
+            if (!chainResult.IsValid)
+                continue;
+
+            return new SignatureVerificationResult(SignatureStatus.Valid, Reason: null)
+            {
+                Publisher = publisher,
+                Thumbprint = thumbprint,
+                SignatureType = SignatureType.Repository,
+                Timestamp = timestamp,
+            };
         }
 
         return null;
@@ -394,4 +437,10 @@ public record SignatureVerificationResult(SignatureStatus Status, string? Reason
     /// (comparing against actual package bytes) requires NuGet's ZIP hashing algorithm.
     /// </summary>
     public string? ContentHash { get; init; }
+
+    /// <summary>
+    /// Repository counter-signature, present when the primary signature is an author signature
+    /// and the repository (e.g. nuget.org) has counter-signed the package.
+    /// </summary>
+    public SignatureVerificationResult? CounterSignature { get; init; }
 }
