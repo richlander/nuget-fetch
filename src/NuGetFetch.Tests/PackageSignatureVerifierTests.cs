@@ -236,6 +236,41 @@ public class PackageSignatureVerifierTests : IDisposable
     }
 
     [Fact]
+    public async Task VerifySignatureFile_MatchesPackageVerification()
+    {
+        // Verify that VerifySignatureFile on an extracted .signature.p7s
+        // produces the same result as VerifyPackage on the .nupkg
+        string nupkgPath = await DownloadPackageAsync("Newtonsoft.Json", "13.0.3");
+        try
+        {
+            var packageResult = PackageSignatureVerifier.VerifyPackage(nupkgPath);
+
+            // Extract the .signature.p7s from the nupkg
+            string tempDir = Path.Combine(Path.GetTempPath(), $"sig-test-{Guid.NewGuid():N}");
+            System.IO.Compression.ZipFile.ExtractToDirectory(nupkgPath, tempDir);
+            try
+            {
+                string sigPath = Path.Combine(tempDir, ".signature.p7s");
+                Assert.True(File.Exists(sigPath));
+
+                var fileResult = PackageSignatureVerifier.VerifySignatureFile(sigPath);
+
+                Assert.Equal(packageResult.Status, fileResult.Status);
+                Assert.Equal(packageResult.Publisher, fileResult.Publisher);
+                Assert.Equal(packageResult.SignatureType, fileResult.SignatureType);
+            }
+            finally
+            {
+                Directory.Delete(tempDir, true);
+            }
+        }
+        finally
+        {
+            File.Delete(nupkgPath);
+        }
+    }
+
+    [Fact]
     public async Task VerifyPackage_RepositorySignedPackage_HasNoCounterSignature()
     {
         // dotnet-install is repository-signed only (no author signature)

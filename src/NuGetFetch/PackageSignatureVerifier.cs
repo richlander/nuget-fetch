@@ -44,6 +44,15 @@ public static class PackageSignatureVerifier
         return VerifySignature(signatureBytes);
     }
 
+    /// <summary>
+    /// Verifies a raw .signature.p7s file (e.g. from an extracted package cache).
+    /// </summary>
+    public static SignatureVerificationResult VerifySignatureFile(string signaturePath)
+    {
+        byte[] signatureBytes = File.ReadAllBytes(signaturePath);
+        return VerifySignature(signatureBytes);
+    }
+
     private static byte[]? ExtractSignature(Stream nupkgStream)
     {
         using ZipArchive archive = new(nupkgStream, ZipArchiveMode.Read, leaveOpen: true);
