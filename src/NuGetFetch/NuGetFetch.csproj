@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <LangVersion>13</LangVersion>
     <IsAotCompatible>true</IsAotCompatible>
-    <Version>0.6.0</Version>
+    <Version>0.6.1</Version>
   </PropertyGroup>
 
   <PropertyGroup>
