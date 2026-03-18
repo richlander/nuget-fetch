@@ -12,21 +12,59 @@ string rid = RuntimeInformation.RuntimeIdentifier;
 Console.WriteLine($"RID: {rid}");
 Console.WriteLine();
 
+// Resolve sources from nuget.config (includes credentials)
+string? userConfig = Path.Combine(
+    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+    ".nuget", "NuGet", "NuGet.Config");
+IReadOnlyList<PackageSource> sources = File.Exists(userConfig)
+    ? SourceResolver.ResolveSources(configPath: userConfig)
+    : SourceResolver.ResolveSources();
+Console.WriteLine("Sources:");
+foreach (PackageSource source in sources)
+{
+    string auth = source.Credential is not null ? " (authenticated)" : "";
+    Console.WriteLine($"  {source.Name}: {source.Url}{auth}");
+}
+Console.WriteLine();
+
 using HttpClient http = new();
 NuGetClient client = new(http);
 
-// Resolve version
-string? version = requestedVersion ?? await client.GetLatestVersionAsync(packageId);
+// Resolve version across all configured sources
+string? version = requestedVersion ?? await client.GetLatestVersionAsync(packageId, sources);
 if (version is null)
 {
     Console.Error.WriteLine($"Package '{packageId}' not found.");
     return 1;
 }
 
+// Find which source has this package+version
+PackageSource? matchedSource = null;
+foreach (PackageSource source in sources)
+{
+    try
+    {
+        IReadOnlyList<string> versions = await client.GetVersionsAsync(packageId, source.Url, source.Credential);
+        if (versions.Contains(version, StringComparer.OrdinalIgnoreCase))
+        {
+            matchedSource = source;
+            break;
+        }
+    }
+    catch (HttpRequestException ex)
+    {
+        Console.WriteLine($"  Warning: {source.Name}: {ex.Message}");
+    }
+}
+
 Console.WriteLine($"Package: {packageId} v{version}");
+if (matchedSource is not null)
+{
+    Console.WriteLine($"Source:  {matchedSource.Name}");
+}
 
 // Download and extract the main package
-string extractPath = await DownloadPackageAsync(client, packageId, version);
+string extractPath = await DownloadPackageAsync(client, packageId, version, matchedSource);
 
 // Look for DotnetToolSettings.xml with RID-specific packages
 string? toolExecutable = ResolveToolExecutable(extractPath, rid);
@@ -41,7 +79,7 @@ string? ridPackageId = ResolveRidPackageId(extractPath, rid);
 if (ridPackageId is not null)
 {
     Console.WriteLine($"RID package: {ridPackageId}");
-    string ridExtractPath = await DownloadPackageAsync(client, ridPackageId, version);
+    string ridExtractPath = await DownloadPackageAsync(client, ridPackageId, version, matchedSource);
 
     toolExecutable = ResolveToolExecutable(ridExtractPath, rid);
     if (toolExecutable is not null)
@@ -60,7 +98,7 @@ if (tfmPath is not null)
 
 return 0;
 
-async Task<string> DownloadPackageAsync(NuGetClient client, string id, string version)
+async Task<string> DownloadPackageAsync(NuGetClient client, string id, string version, PackageSource? source = null)
 {
     string path = Path.Combine(Path.GetTempPath(), "nuget-fetch-demo", id, version);
     if (Directory.Exists(path))
@@ -70,7 +108,7 @@ async Task<string> DownloadPackageAsync(NuGetClient client, string id, string ve
     }
 
     Console.Write($"  Downloading: {id}... ");
-    using Stream nupkg = await client.DownloadAsync(id, version);
+    using Stream nupkg = await client.DownloadAsync(id, version, source?.Url, source?.Credential);
     await PackageExtractor.ExtractAsync(nupkg, path);
     Console.WriteLine("done.");
     return path;
