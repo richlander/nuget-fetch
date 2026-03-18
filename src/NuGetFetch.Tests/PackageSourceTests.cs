@@ -53,4 +53,29 @@ public class PackageSourceTests
         Assert.NotNull(header);
         Assert.Equal("Basic", header.Scheme);
     }
+
+    [Fact]
+    public void IsNuGetOrg_RejectsSpoofedUrl()
+    {
+        // Substring-based check would match this; host-based should reject it
+        var source = new PackageSource("evil", "https://evil.com/api.nuget.org/v3/index.json");
+        Assert.False(source.IsNuGetOrg);
+    }
+
+    [Fact]
+    public void IsNuGetOrg_AcceptsSubdomains()
+    {
+        var source = new PackageSource("sub", "https://globalcdn.nuget.org/v3/index.json");
+        Assert.True(source.IsNuGetOrg);
+    }
+
+    [Fact]
+    public void PackageSourceCredential_ToString_MasksPassword()
+    {
+        var cred = new PackageSourceCredential("myuser", "supersecret");
+        string str = cred.ToString();
+        Assert.Contains("myuser", str);
+        Assert.DoesNotContain("supersecret", str);
+        Assert.Contains("***", str);
+    }
 }

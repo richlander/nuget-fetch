@@ -1,12 +1,15 @@
 namespace NuGetFetch;
 
-public record PackageIdentity(string Id, string Version);
+public record PackageIdentity(string Id, string? Version);
 
 public record PackageSource(string Name, string Url, PackageSourceCredential? Credential = null)
 {
     public static PackageSource NuGetOrg { get; } = new("nuget.org", "https://api.nuget.org/v3/index.json");
 
-    public bool IsNuGetOrg => Url.Contains("api.nuget.org", StringComparison.OrdinalIgnoreCase);
+    public bool IsNuGetOrg =>
+        Uri.TryCreate(Url, UriKind.Absolute, out Uri? uri)
+        && (uri.Host.Equals("api.nuget.org", StringComparison.OrdinalIgnoreCase)
+            || uri.Host.EndsWith(".nuget.org", StringComparison.OrdinalIgnoreCase));
 
     public string? GetFlatContainerUrl() =>
         IsNuGetOrg ? NuGetClient.NuGetOrgFlatContainer.TrimEnd('/') : null;
@@ -24,7 +27,10 @@ public record PackageSource(string Name, string Url, PackageSourceCredential? Cr
     }
 }
 
-public record PackageSourceCredential(string Username, string Password);
+public record PackageSourceCredential(string Username, string Password)
+{
+    public override string ToString() => $"PackageSourceCredential {{ Username = {Username}, Password = *** }}";
+}
 
 public record ExtractionResult(
     string Path,

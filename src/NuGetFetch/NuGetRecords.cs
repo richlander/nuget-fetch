@@ -6,7 +6,7 @@ namespace NuGetFetch;
 
 public record ServiceIndex(
     string Version,
-    IList<ServiceResource> Resources);
+    IReadOnlyList<ServiceResource> Resources);
 
 public record ServiceResource(
     [property: JsonPropertyName("@id")] string Id,
@@ -16,13 +16,13 @@ public record ServiceResource(
 // NuGet V3 Flat-Container Version Index
 
 public record VersionIndex(
-    IList<string> Versions);
+    IReadOnlyList<string> Versions);
 
 // NuGet Search API
 
 public record SearchResponse(
     int TotalHits,
-    IList<SearchResult> Data);
+    IReadOnlyList<SearchResult> Data);
 
 public record SearchResult(
     string Id,
@@ -30,7 +30,7 @@ public record SearchResult(
     string? Description = null,
     long TotalDownloads = 0,
     bool Verified = false,
-    IList<SearchVersion>? Versions = null);
+    IReadOnlyList<SearchVersion>? Versions = null);
 
 public record SearchVersion(
     string Version,

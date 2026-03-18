@@ -10,7 +10,7 @@ public static class PackageExtractor
     /// <summary>
     /// Extracts a .nupkg stream to a destination directory.
     /// </summary>
-    public static async Task<string> ExtractAsync(Stream nupkg, string destinationPath)
+    public static async Task<string> ExtractAsync(Stream nupkg, string destinationPath, CancellationToken cancellationToken = default)
     {
         Directory.CreateDirectory(destinationPath);
 
@@ -21,10 +21,10 @@ public static class PackageExtractor
         {
             using (FileStream temp = File.Create(tempFile))
             {
-                await nupkg.CopyToAsync(temp);
+                await nupkg.CopyToAsync(temp, cancellationToken).ConfigureAwait(false);
             }
 
-            ZipFile.ExtractToDirectory(tempFile, destinationPath, overwriteFiles: true);
+            ExtractWithValidation(tempFile, destinationPath);
         }
         finally
         {
@@ -40,8 +40,61 @@ public static class PackageExtractor
     public static string Extract(string nupkgPath, string destinationPath)
     {
         Directory.CreateDirectory(destinationPath);
-        ZipFile.ExtractToDirectory(nupkgPath, destinationPath, overwriteFiles: true);
+        ExtractWithValidation(nupkgPath, destinationPath);
         return destinationPath;
+    }
+
+    /// <summary>
+    /// Extracts a zip file with defense-in-depth path traversal validation.
+    /// Rejects entries with absolute paths, '..' segments, or paths
+    /// that would escape the destination directory.
+    /// </summary>
+    private static void ExtractWithValidation(string zipPath, string destinationPath)
+    {
+        string fullDestination = Path.GetFullPath(destinationPath);
+
+        using ZipArchive archive = ZipFile.OpenRead(zipPath);
+
+        foreach (ZipArchiveEntry entry in archive.Entries)
+        {
+            if (string.IsNullOrEmpty(entry.FullName))
+            {
+                continue;
+            }
+
+            // Reject entries with path traversal components
+            if (entry.FullName.Contains("..", StringComparison.Ordinal)
+                || Path.IsPathRooted(entry.FullName)
+                || entry.FullName.Contains('\0'))
+            {
+                throw new InvalidDataException($"Zip entry '{entry.FullName}' contains invalid path components.");
+            }
+
+            string targetPath = Path.GetFullPath(Path.Combine(fullDestination, entry.FullName));
+
+            if (!targetPath.StartsWith(fullDestination + Path.DirectorySeparatorChar, StringComparison.Ordinal)
+                && !targetPath.Equals(fullDestination, StringComparison.Ordinal))
+            {
+                throw new InvalidDataException($"Zip entry '{entry.FullName}' would extract outside the target directory.");
+            }
+
+            // Directory entry
+            if (entry.FullName.EndsWith('/') || entry.FullName.EndsWith('\\'))
+            {
+                Directory.CreateDirectory(targetPath);
+                continue;
+            }
+
+            // File entry
+            string? parentDir = Path.GetDirectoryName(targetPath);
+
+            if (parentDir is not null)
+            {
+                Directory.CreateDirectory(parentDir);
+            }
+
+            entry.ExtractToFile(targetPath, overwrite: true);
+        }
     }
 
     /// <summary>
@@ -58,7 +111,7 @@ public static class PackageExtractor
 
         if (atIndex < 0)
         {
-            return new PackageIdentity(spec.Trim(), string.Empty);
+            return new PackageIdentity(spec.Trim(), null);
         }
 
         string id = spec[..atIndex].Trim();

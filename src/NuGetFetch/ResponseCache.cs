@@ -6,6 +6,8 @@ namespace NuGetFetch;
 /// <summary>
 /// Generic disk cache with category-based partitioning and TTL support.
 /// Uses SHA256-hashed keys and subdirectory bucketing for filesystem safety.
+/// Caching is best-effort: all read/write failures are silently ignored
+/// to ensure cache problems never disrupt normal operation.
 /// </summary>
 public class ResponseCache
 {
@@ -126,7 +128,8 @@ public class ResponseCache
     }
 
     /// <summary>
-    /// Stores content in the cache. Best-effort — failures are silently ignored.
+    /// Stores content in the cache. Best-effort — failures are silently ignored
+    /// to ensure cache problems never disrupt normal operation.
     /// </summary>
     public void Set(string category, string key, string content, string extension = "json")
     {
@@ -140,7 +143,11 @@ public class ResponseCache
                 Directory.CreateDirectory(dir);
             }
 
-            File.WriteAllText(path, content);
+            // Atomic write: write to temp file, then move into place
+            string tempPath = path + $".tmp-{Guid.NewGuid():N}";
+            File.WriteAllText(tempPath, content);
+
+            File.Move(tempPath, path, overwrite: true);
         }
         catch
         {
@@ -149,7 +156,8 @@ public class ResponseCache
     }
 
     /// <summary>
-    /// Stores raw byte content in the cache.
+    /// Stores raw byte content in the cache. Best-effort — failures are silently
+    /// ignored to ensure cache problems never disrupt normal operation.
     /// </summary>
     public void SetBytes(string category, string key, byte[] content, string extension = "json")
     {
@@ -163,7 +171,11 @@ public class ResponseCache
                 Directory.CreateDirectory(dir);
             }
 
-            File.WriteAllBytes(path, content);
+            // Atomic write: write to temp file, then move into place
+            string tempPath = path + $".tmp-{Guid.NewGuid():N}";
+            File.WriteAllBytes(tempPath, content);
+
+            File.Move(tempPath, path, overwrite: true);
         }
         catch
         {

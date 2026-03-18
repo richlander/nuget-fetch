@@ -8,16 +8,18 @@ public static class TfmResolver
 {
     /// <summary>
     /// Resolves the best assembly path for a specific or auto-selected TFM.
-    /// Returns the path to the TFM directory, or null if not found.
+    /// When <paramref name="targetTfm"/> is provided, selects the highest-priority
+    /// compatible TFM (priority &lt;= target). Returns the path to the TFM directory,
+    /// or null if not found.
     /// </summary>
-    public static string? ResolvePackagePath(string extractedPath, string? tfm = null)
+    public static string? ResolvePackagePath(string extractedPath, string? tfm = null, string? targetTfm = null)
     {
         if (tfm is not null)
         {
             return FindByTfm(extractedPath, tfm);
         }
 
-        return FindHighestTfm(extractedPath);
+        return FindHighestTfm(extractedPath, targetTfm);
     }
 
     /// <summary>
@@ -141,6 +143,59 @@ public static class TfmResolver
         return 0;
     }
 
+    /// <summary>
+    /// Gets the framework family for a TFM. Used to prevent cross-family matching
+    /// (e.g., net8.0 should not accept net481 assemblies).
+    /// </summary>
+    public static TfmFamily GetTfmFamily(string tfm)
+    {
+        ReadOnlySpan<char> span = tfm.AsSpan();
+
+        if (span.StartsWith("netstandard", StringComparison.OrdinalIgnoreCase))
+            return TfmFamily.NetStandard;
+
+        if (span.StartsWith("netcoreapp", StringComparison.OrdinalIgnoreCase))
+            return TfmFamily.NetCore;
+
+        if (span.StartsWith("net", StringComparison.OrdinalIgnoreCase) && span.Length >= 4)
+        {
+            // net5.0+ (modern .NET) vs net45/net461 (.NET Framework)
+            ReadOnlySpan<char> versionPart = span[3..];
+            int dotIndex = versionPart.IndexOf('.');
+
+            if (dotIndex > 0 && int.TryParse(versionPart[..dotIndex], out int major) && major >= 5)
+                return TfmFamily.NetModern;
+
+            if (char.IsAsciiDigit(versionPart[0]))
+                return TfmFamily.NetFramework;
+        }
+
+        return TfmFamily.Unknown;
+    }
+
+    /// <summary>
+    /// Returns true if a candidate TFM is compatible with a target TFM.
+    /// Modern .NET (net5.0+) accepts: NetModern (≤ target), NetCoreApp, NetStandard.
+    /// .NET Framework accepts: NetFramework (≤ target), NetStandard.
+    /// NetStandard is compatible with all families.
+    /// </summary>
+    public static bool IsTfmCompatible(string candidateTfm, string targetTfm)
+    {
+        TfmFamily candidateFamily = GetTfmFamily(candidateTfm);
+        TfmFamily targetFamily = GetTfmFamily(targetTfm);
+
+        if (candidateFamily == TfmFamily.NetStandard)
+            return true;
+
+        return targetFamily switch
+        {
+            TfmFamily.NetModern => candidateFamily is TfmFamily.NetModern or TfmFamily.NetCore or TfmFamily.NetStandard,
+            TfmFamily.NetCore => candidateFamily is TfmFamily.NetCore or TfmFamily.NetStandard,
+            TfmFamily.NetFramework => candidateFamily is TfmFamily.NetFramework or TfmFamily.NetStandard,
+            _ => true,
+        };
+    }
+
     private static string? FindByTfm(string extractedPath, string tfm)
     {
         // Check lib/{tfm} and tools/{tfm}
@@ -171,8 +226,9 @@ public static class TfmResolver
         return null;
     }
 
-    private static string? FindHighestTfm(string extractedPath)
+    private static string? FindHighestTfm(string extractedPath, string? targetTfm = null)
     {
+        int maxPriority = targetTfm is not null ? GetTfmPriority(targetTfm) : int.MaxValue;
         string? bestPath = null;
         int bestPriority = -1;
 
@@ -190,7 +246,13 @@ public static class TfmResolver
                 string tfmName = Path.GetFileName(tfmDir);
                 int priority = GetTfmPriority(tfmName);
 
-                if (priority > bestPriority)
+                // When a target TFM is specified, enforce family compatibility
+                if (targetTfm is not null && !IsTfmCompatible(tfmName, targetTfm))
+                {
+                    continue;
+                }
+
+                if (priority > bestPriority && priority <= maxPriority)
                 {
                     bestPriority = priority;
                     bestPath = tfmDir;
@@ -243,8 +305,29 @@ public static class TfmResolver
     }
 
     /// <summary>
-    /// Checks if a string looks like a TFM (starts with "net").
+    /// Checks if a string looks like a TFM (starts with "net" followed by a digit,
+    /// or is a known TFM prefix like "netcoreapp" or "netstandard").
     /// </summary>
     public static bool IsTfmLike(string name) =>
-        name.StartsWith("net", StringComparison.OrdinalIgnoreCase);
+        name.StartsWith("net", StringComparison.OrdinalIgnoreCase)
+        && name.Length >= 4
+        && (char.IsAsciiDigit(name[3])
+            || name.StartsWith("netcoreapp", StringComparison.OrdinalIgnoreCase)
+            || name.StartsWith("netstandard", StringComparison.OrdinalIgnoreCase));
+}
+
+/// <summary>
+/// Represents the broad family of a Target Framework Moniker.
+/// </summary>
+public enum TfmFamily
+{
+    Unknown,
+    /// <summary>.NET 5+ (net5.0, net6.0, net8.0, etc.)</summary>
+    NetModern,
+    /// <summary>.NET Core (netcoreapp2.1, netcoreapp3.1, etc.)</summary>
+    NetCore,
+    /// <summary>.NET Standard (netstandard1.0, netstandard2.0, etc.)</summary>
+    NetStandard,
+    /// <summary>.NET Framework (net45, net461, net481, etc.)</summary>
+    NetFramework,
 }

@@ -38,7 +38,7 @@ public class PackageCache
     public string? TryGet(string id, string version)
     {
         string normalizedId = id.ToLowerInvariant();
-        string normalizedVersion = version.ToLowerInvariant();
+        string normalizedVersion = NuGetClient.NormalizeVersion(version);
 
         // Check NuGet global cache (read-only)
         if (!_skipNuGetCache)
@@ -64,12 +64,13 @@ public class PackageCache
 
     /// <summary>
     /// Caches an extracted package in the app cache directory.
+    /// Uses atomic directory rename to prevent partial-copy races.
     /// Returns the cache path, or null on failure.
     /// </summary>
     public string? Cache(string id, string version, string sourcePath)
     {
         string normalizedId = id.ToLowerInvariant();
-        string normalizedVersion = version.ToLowerInvariant();
+        string normalizedVersion = NuGetClient.NormalizeVersion(version);
         string targetPath = Path.Combine(_appCacheBase, normalizedId, normalizedVersion);
 
         if (Directory.Exists(targetPath))
@@ -79,13 +80,24 @@ public class PackageCache
 
         try
         {
-            CopyDirectory(sourcePath, targetPath);
+            // Copy to a temp directory first, then atomically move into place
+            string tempPath = targetPath + $".tmp-{Guid.NewGuid():N}";
+            CopyDirectory(sourcePath, tempPath);
+
+            try
+            {
+                Directory.Move(tempPath, targetPath);
+            }
+            catch (IOException) when (Directory.Exists(targetPath))
+            {
+                // Another process won the race — use their copy
+                try { Directory.Delete(tempPath, recursive: true); } catch { }
+            }
+
             return targetPath;
         }
         catch
         {
-            // Clean up partial copy
-            try { Directory.Delete(targetPath, recursive: true); } catch { }
             return null;
         }
     }
@@ -94,7 +106,7 @@ public class PackageCache
     /// Gets the path where a package would be cached.
     /// </summary>
     public string GetCachePath(string id, string version) =>
-        Path.Combine(_appCacheBase, id.ToLowerInvariant(), version.ToLowerInvariant());
+        Path.Combine(_appCacheBase, id.ToLowerInvariant(), NuGetClient.NormalizeVersion(version));
 
     /// <summary>
     /// Finds the latest cached version of a package across both caches.
