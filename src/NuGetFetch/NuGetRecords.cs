@@ -35,3 +35,77 @@ public record SearchResult(
 public record SearchVersion(
     string Version,
     long Downloads);
+
+// NuGet V3 Registration API
+
+public record RegistrationLeaf(
+    DateTimeOffset? Published,
+    bool Listed,
+    string? PackageContent,
+    string? CatalogEntry,
+    string? Registration);
+
+// NuGet V3 Catalog API
+
+public record CatalogPackageDetails(
+    string? Authors = null,
+    string? Description = null,
+    string? LicenseExpression = null,
+    string? ProjectUrl = null,
+    PackageDeprecation? Deprecation = null,
+    IList<CatalogDependencyGroup>? DependencyGroups = null);
+
+public record CatalogDependencyGroup(
+    string? TargetFramework = null,
+    IList<CatalogDependency>? Dependencies = null);
+
+public record CatalogDependency(
+    string Id,
+    string? Range = null);
+
+public record PackageDeprecation(
+    IList<string>? Reasons = null,
+    string? Message = null,
+    AlternatePackage? AlternatePackage = null)
+{
+    public string? Summary => Message ?? (Reasons is { Count: > 0 } ? string.Join(", ", Reasons) : null);
+}
+
+public record AlternatePackage(
+    string Id,
+    string? Range = null);
+
+// NuGet V3 Vulnerability API
+
+public record VulnerabilityIndexEntry(
+    [property: JsonPropertyName("@name")] string Name,
+    [property: JsonPropertyName("@id")] string Id,
+    [property: JsonPropertyName("@updated")] DateTimeOffset? Updated = null,
+    string? Comment = null);
+
+public record PackageVulnerability(
+    string Url,
+    int Severity,
+    string Versions);
+
+// Aggregated lean metadata projection
+
+public record PackageMetadata(
+    string Id,
+    string Version,
+    DateTimeOffset? Published = null,
+    bool? Listed = null,
+    string? PackageContentUrl = null,
+    string? CatalogEntryUrl = null,
+    string? Authors = null,
+    string? Description = null,
+    string? LicenseExpression = null,
+    string? ProjectUrl = null,
+    long? TotalDownloads = null,
+    long? VersionDownloads = null,
+    int? VersionCount = null,
+    bool? Verified = null,
+    IList<string>? Owners = null,
+    long? PackageSize = null,
+    PackageDeprecation? Deprecation = null,
+    IList<PackageVulnerability>? Vulnerabilities = null);

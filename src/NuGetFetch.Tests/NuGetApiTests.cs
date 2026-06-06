@@ -177,4 +177,95 @@ public class NuGetApiTests
         var result = await NuGetApi.GetVersionIndexAsync(stream);
         Assert.Null(result);
     }
+
+    [Fact]
+    public async Task GetRegistrationLeafAsync_ValidJson()
+    {
+        string json = """
+        {
+          "catalogEntry": "https://api.nuget.org/v3/catalog0/data/pkg.json",
+          "listed": true,
+          "packageContent": "https://api.nuget.org/v3-flatcontainer/package/1.0.0/package.1.0.0.nupkg",
+          "published": "2024-01-02T03:04:05Z",
+          "registration": "https://api.nuget.org/v3/registration5-semver1/package/index.json"
+        }
+        """;
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(json));
+
+        RegistrationLeaf? result = await NuGetApi.GetRegistrationLeafAsync(stream);
+
+        Assert.NotNull(result);
+        Assert.True(result.Listed);
+        Assert.Equal("https://api.nuget.org/v3/catalog0/data/pkg.json", result.CatalogEntry);
+        Assert.Equal(2024, result.Published!.Value.Year);
+    }
+
+    [Fact]
+    public async Task GetCatalogPackageDetailsAsync_WithDeprecationAndDependencies()
+    {
+        string json = """
+        {
+          "authors": "Test Author",
+          "description": "Test package",
+          "licenseExpression": "MIT",
+          "projectUrl": "https://example.test",
+          "deprecation": {
+            "reasons": [ "Legacy" ],
+            "message": "Use something else",
+            "alternatePackage": { "id": "Other.Package", "range": "[2.0.0, )" }
+          },
+          "dependencyGroups": [
+            {
+              "targetFramework": "net8.0",
+              "dependencies": [
+                { "id": "Dependency.A", "range": "[1.0.0, 2.0.0)" }
+              ]
+            }
+          ]
+        }
+        """;
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(json));
+
+        CatalogPackageDetails? result = await NuGetApi.GetCatalogPackageDetailsAsync(stream);
+
+        Assert.NotNull(result);
+        Assert.Equal("Test Author", result.Authors);
+        Assert.Equal("MIT", result.LicenseExpression);
+        Assert.Equal("Use something else", result.Deprecation!.Message);
+        Assert.Equal("Other.Package", result.Deprecation.AlternatePackage!.Id);
+        Assert.Equal("Dependency.A", result.DependencyGroups![0].Dependencies![0].Id);
+    }
+
+    [Fact]
+    public async Task GetVulnerabilityIndexAndPageAsync_ValidJson()
+    {
+        using var indexStream = new MemoryStream(Encoding.UTF8.GetBytes("""
+        [
+          {
+            "@name": "base",
+            "@id": "https://example.test/vulnerability.base.json",
+            "@updated": "2024-01-02T03:04:05Z"
+          }
+        ]
+        """));
+        using var pageStream = new MemoryStream(Encoding.UTF8.GetBytes("""
+        {
+          "test.package": [
+            {
+              "url": "https://github.com/advisories/GHSA-xxxx-yyyy-zzzz",
+              "severity": 2,
+              "versions": "[1.0.0, 2.0.0)"
+            }
+          ]
+        }
+        """));
+
+        IReadOnlyList<VulnerabilityIndexEntry>? index = await NuGetApi.GetVulnerabilityIndexAsync(indexStream);
+        Dictionary<string, IList<PackageVulnerability>>? page = await NuGetApi.GetVulnerabilityPageAsync(pageStream);
+
+        Assert.NotNull(index);
+        Assert.Equal("base", index[0].Name);
+        Assert.NotNull(page);
+        Assert.Equal(2, page["test.package"][0].Severity);
+    }
 }

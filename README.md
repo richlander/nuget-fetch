@@ -20,6 +20,7 @@ dotnet add package NuGetFetch
 - **TFM resolution** — Selects highest-priority target framework
 - **Version resolution** — Latest, wildcard patterns, prerelease
 - **Search** — Query nuget.org with prefix filtering
+- **Metadata** — Registration, catalog, vulnerability, and package size endpoints without `NuGet.Protocol`
 
 ## Usage
 
@@ -51,6 +52,19 @@ IReadOnlyList<SearchResult> results = await search.SearchAsync("json serializer"
 
 // Prefix search
 IReadOnlyList<SearchResult> results = await search.SearchByPrefixAsync("Newtonsoft");
+```
+
+### Metadata
+
+```csharp
+PackageMetadataService metadata = new(httpClient);
+
+PackageMetadata? package = await metadata.GetPackageMetadataAsync(
+    "System.Text.Json",
+    "8.0.0");
+
+IReadOnlyList<PackageVulnerability> vulnerabilities =
+    await metadata.GetVulnerabilitiesAsync("System.Text.Json", "8.0.0");
 ```
 
 ### Caching
@@ -101,6 +115,7 @@ PackageIdentity? parsed = PackageExtractor.ParsePackageReference("Newtonsoft.Jso
 | ------------------ | -------- | ---------------------------- |
 | `NuGetClient`      | Instance | Versions, download           |
 | `SearchService`    | Instance | Search and prefix search     |
+| `PackageMetadataService` | Instance | Registration/catalog/vulnerability metadata |
 | `PackageCache`     | Instance | Two-tier package cache       |
 | `ResponseCache`    | Instance | Disk cache with TTL          |
 | `PackageExtractor` | Static   | Extract `.nupkg`, parse      |
@@ -123,3 +138,11 @@ Follows the [distroessed][1] library patterns:
 
 - [`NuGet.Versioning`](https://www.nuget.org/packages/NuGet.Versioning)
   — Version parsing and comparison
+
+## Library boundary
+
+NuGetFetch intentionally does not wrap the official NuGet primitive libraries.
+Consumers should use official packages such as `NuGet.Versioning`,
+`NuGet.Frameworks`, `NuGet.Configuration`, or `NuGet.Packaging` directly when
+they need those primitives. NuGetFetch focuses on lean NuGet V3 HTTP services
+that are otherwise only available through heavier client abstractions.
