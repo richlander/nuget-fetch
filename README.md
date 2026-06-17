@@ -95,6 +95,24 @@ string? version = await client.ResolveVersionPatternAsync("Newtonsoft.Json", "13
 PackageIdentity? parsed = PackageExtractor.ParsePackageReference("Newtonsoft.Json@13.0.3");
 ```
 
+### Tool wrapper packages
+
+.NET tools published as runtime-specific (e.g. NativeAOT) executables ship a thin wrapper
+package whose only payload is a `DotnetToolSettings.xml` manifest pointing at per-RID packages
+(`<id>.win-x64`, `<id>.osx-arm64`, `<id>.any`, …). To read managed metadata, redirect to the
+portable `any` payload:
+
+```csharp
+string extractPath = PackageExtractor.Extract(nupkgPath, destination);
+
+// Returns "mytool.any" when the package is a wrapper with no managed libraries; else null.
+string? payloadId = PackageExtractor.TryGetToolWrapperRedirect(extractPath);
+if (payloadId is not null)
+{
+    // Fetch + extract payloadId at the same version, then inspect that.
+}
+```
+
 ## API Overview
 
 | Class              | Kind     | Purpose                      |

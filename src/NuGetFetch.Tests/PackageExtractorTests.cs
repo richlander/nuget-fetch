@@ -157,4 +157,108 @@ public class PackageExtractorTests
             if (File.Exists(zipFile)) File.Delete(zipFile);
         }
     }
+
+    private static string WriteToolSettings(string root, string rid, string id)
+    {
+        string dir = Path.Combine(root, "tools", "net10.0", "any");
+        Directory.CreateDirectory(dir);
+        string path = Path.Combine(dir, "DotnetToolSettings.xml");
+        File.WriteAllText(path, $"""
+            <?xml version="1.0" encoding="utf-8"?>
+            <DotNetCliTool Version="2">
+              <Commands>
+                <Command Name="mytool" />
+              </Commands>
+              <RuntimeIdentifierPackages>
+                <RuntimeIdentifierPackage RuntimeIdentifier="linux-x64" Id="mytool.linux-x64" />
+                <RuntimeIdentifierPackage RuntimeIdentifier="{rid}" Id="{id}" />
+              </RuntimeIdentifierPackages>
+            </DotNetCliTool>
+            """);
+        return path;
+    }
+
+    [Fact]
+    public void HasManagedLibraries_TrueForNonResourceDll()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), $"nf-test-{Guid.NewGuid():N}");
+        try
+        {
+            string libDir = Path.Combine(dir, "tools", "net10.0", "any");
+            Directory.CreateDirectory(libDir);
+            File.WriteAllText(Path.Combine(libDir, "MyLib.dll"), "stub");
+
+            Assert.True(PackageExtractor.HasManagedLibraries(dir));
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, true);
+        }
+    }
+
+    [Fact]
+    public void HasManagedLibraries_FalseForResourceOnlyOrEmpty()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), $"nf-test-{Guid.NewGuid():N}");
+        try
+        {
+            string libDir = Path.Combine(dir, "tools", "net10.0", "any", "de");
+            Directory.CreateDirectory(libDir);
+            File.WriteAllText(Path.Combine(libDir, "MyLib.resources.dll"), "stub");
+
+            Assert.False(PackageExtractor.HasManagedLibraries(dir));
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, true);
+        }
+    }
+
+    [Fact]
+    public void TryGetToolWrapperRedirect_ReturnsAnyPackage_ForWrapper()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), $"nf-test-{Guid.NewGuid():N}");
+        try
+        {
+            WriteToolSettings(dir, "any", "mytool.any");
+            Assert.Equal("mytool.any", PackageExtractor.TryGetToolWrapperRedirect(dir));
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, true);
+        }
+    }
+
+    [Fact]
+    public void TryGetToolWrapperRedirect_NullWhenManagedLibrariesPresent()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), $"nf-test-{Guid.NewGuid():N}");
+        try
+        {
+            WriteToolSettings(dir, "any", "mytool.any");
+            string libDir = Path.Combine(dir, "tools", "net10.0", "any");
+            File.WriteAllText(Path.Combine(libDir, "mytool.dll"), "stub");
+
+            Assert.Null(PackageExtractor.TryGetToolWrapperRedirect(dir));
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, true);
+        }
+    }
+
+    [Fact]
+    public void TryGetToolWrapperRedirect_NullWhenNoManifest()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), $"nf-test-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(dir);
+            Assert.Null(PackageExtractor.TryGetToolWrapperRedirect(dir));
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, true);
+        }
+    }
 }
