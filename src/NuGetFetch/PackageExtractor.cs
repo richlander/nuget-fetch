@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Xml.Linq;
 
 namespace NuGetFetch;
 
@@ -141,5 +142,87 @@ public static class PackageExtractor
         bool hasTools = Directory.Exists(Path.Combine(extractedPath, "tools"));
 
         return hasNuspec || hasLib || hasTools;
+    }
+
+    /// <summary>
+    /// Returns true if the extracted package contains at least one non-resource managed
+    /// assembly (a <c>*.dll</c> that is not a <c>*.resources.dll</c>) anywhere in its layout.
+    /// </summary>
+    public static bool HasManagedLibraries(string extractedPath)
+    {
+        if (!Directory.Exists(extractedPath))
+        {
+            return false;
+        }
+
+        foreach (string dll in Directory.EnumerateFiles(extractedPath, "*.dll", SearchOption.AllDirectories))
+        {
+            if (!dll.EndsWith(".resources.dll", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Detects a runtime-specific .NET tool "wrapper" package and returns the id of the
+    /// per-RID payload package to inspect instead.
+    /// </summary>
+    /// <remarks>
+    /// .NET tools published as runtime-specific (e.g. NativeAOT) executables ship a thin
+    /// wrapper package whose only payload is a <c>tools/**/DotnetToolSettings.xml</c> manifest
+    /// pointing at per-RID packages (<c>&lt;id&gt;.win-x64</c>, <c>&lt;id&gt;.osx-arm64</c>,
+    /// <c>&lt;id&gt;.any</c>, …). The wrapper carries no managed assemblies, so a consumer that
+    /// wants to read managed metadata should redirect to the portable <paramref name="runtimeIdentifier"/>
+    /// package (the framework-dependent build) at the same version.
+    /// </remarks>
+    /// <param name="extractedPath">Path to an extracted package directory.</param>
+    /// <param name="runtimeIdentifier">The RID payload to resolve. Defaults to <c>any</c> (the portable build).</param>
+    /// <returns>
+    /// The id of the per-RID payload package when <paramref name="extractedPath"/> is a tool
+    /// wrapper with no managed libraries and a matching RID entry; otherwise <c>null</c>.
+    /// </returns>
+    public static string? TryGetToolWrapperRedirect(string extractedPath, string runtimeIdentifier = "any")
+    {
+        // A package that already carries managed libraries is not a wrapper needing redirect.
+        if (HasManagedLibraries(extractedPath))
+        {
+            return null;
+        }
+
+        return ReadRuntimeIdentifierPackageId(extractedPath, runtimeIdentifier);
+    }
+
+    private static string? ReadRuntimeIdentifierPackageId(string extractedPath, string runtimeIdentifier)
+    {
+        if (!Directory.Exists(extractedPath))
+        {
+            return null;
+        }
+
+        string? settingsPath = Directory
+            .EnumerateFiles(extractedPath, "DotnetToolSettings.xml", SearchOption.AllDirectories)
+            .FirstOrDefault();
+        if (settingsPath is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            XDocument doc = XDocument.Load(settingsPath);
+            XElement? package = doc.Descendants()
+                .FirstOrDefault(e => e.Name.LocalName == "RuntimeIdentifierPackage"
+                    && string.Equals((string?)e.Attribute("RuntimeIdentifier"), runtimeIdentifier, StringComparison.OrdinalIgnoreCase));
+
+            string? id = (string?)package?.Attribute("Id");
+            return string.IsNullOrWhiteSpace(id) ? null : id;
+        }
+        catch
+        {
+            return null;
+        }
     }
 }
