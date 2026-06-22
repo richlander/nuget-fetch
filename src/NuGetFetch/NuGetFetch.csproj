@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <LangVersion>13</LangVersion>
     <IsAotCompatible>true</IsAotCompatible>
-    <Version>0.6.2</Version>
+    <Version>0.6.3</Version>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -23,6 +23,16 @@
   <ItemGroup>
     <EmbeddedResource Include="trustedroots/codesignctl.pem" LogicalName="codesignctl.pem" />
     <EmbeddedResource Include="trustedroots/timestampctl.pem" LogicalName="timestampctl.pem" />
+  </ItemGroup>
+
+  <!-- Package grounding (AGENTS.md) shipped at the nupkg root so coding agents resolve the
+       correct NuGetFetch API shapes (BYO HttpClient, static PackageExtractor/NormalizeVersion,
+       SearchService) instead of reaching for the official NuGet.Protocol API or reverse-
+       engineering the DLL. dotnet-inspect and the NuGet MCP surface this to agents. -->
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)..\..\grounding\nugetfetch\AGENTS.md"
+          Pack="true"
+          PackagePath="\" />
   </ItemGroup>
 
 </Project>
