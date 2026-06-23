@@ -6,7 +6,8 @@
     <Nullable>enable</Nullable>
     <LangVersion>13</LangVersion>
     <IsAotCompatible>true</IsAotCompatible>
-    <Version>0.6.2</Version>
+    <Version>0.6.3</Version>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -23,6 +24,20 @@
   <ItemGroup>
     <EmbeddedResource Include="trustedroots/codesignctl.pem" LogicalName="codesignctl.pem" />
     <EmbeddedResource Include="trustedroots/timestampctl.pem" LogicalName="timestampctl.pem" />
+  </ItemGroup>
+
+  <!-- Consumer/package grounding shipped at the nupkg root. Sourced from grounding/nugetfetch/.
+       dotnet-inspect (readme) and the NuGet MCP resolve this AGENTS.md so an agent learns the
+       NuGetFetch surface (which deliberately shadows, but differs from, the official NuGet client)
+       instead of hallucinating NuGet.Protocol shapes. Validated via eval before publishing; see
+       github.com/richlander/dotnet-package-grounding (nugetfetch unit). -->
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)..\..\README.md"
+          Pack="true"
+          PackagePath="\" />
+    <None Include="$(MSBuildThisFileDirectory)..\..\grounding\nugetfetch\AGENTS.md"
+          Pack="true"
+          PackagePath="\" />
   </ItemGroup>
 
 </Project>
