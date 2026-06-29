@@ -6,7 +6,8 @@
     <Nullable>enable</Nullable>
     <LangVersion>13</LangVersion>
     <IsAotCompatible>true</IsAotCompatible>
-    <Version>0.6.2</Version>
+    <Version>0.6.3</Version>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -14,6 +15,12 @@
     <Description>A lightweight NuGet client for downloading and extracting NuGet packages</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
+
+  <!-- Ship README + grounding (AGENTS.md) at the nupkg root so tools resolve them. -->
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+    <None Include="..\..\grounding\nugetfetch\AGENTS.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="NuGet.Versioning" Version="7.0.1" />
