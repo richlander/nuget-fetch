@@ -6,7 +6,7 @@ to move an agent from "fails / hand-rolls" to "uses the API correctly, first try
 Machine form + fixtures: `eval.yaml`. Datasets/cards: `data/`.
 
 | # | Task | Key API | Anchor |
-|---|------|---------|--------|
+| --- | --- | --- | --- |
 | 1 | Look up the latest published version of a package | `GetLatestVersionAsync` | `latest: <n>.<n>.<n>` |
 | 2 | Print the oldest published version of a package | `GetVersionsAsync` | `oldest: 3.5.8` |
 | 3 | Download a specific package version to a .nupkg file | `.Download` | `downloaded: <bytes>` |
