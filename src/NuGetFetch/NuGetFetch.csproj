@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <LangVersion>13</LangVersion>
     <IsAotCompatible>true</IsAotCompatible>
-    <Version>0.6.3</Version>
+    <Version>0.7.0</Version>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
