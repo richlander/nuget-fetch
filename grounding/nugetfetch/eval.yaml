@@ -1,0 +1,259 @@
+config:
+  max_parallel_scenarios: 1
+
+# =============================================================================
+# NuGetFetch 6-scenario unit (N1-N6). NuGetFetch is a genuinely unknown package: a
+# small, AOT-friendly NuGet client (richlander/nuget-fetch) with near-zero presence in
+# model training data. Its surface actively MISLEADS: a model reaches for the official
+# NuGet.Protocol/NuGet.Client API (SourceRepository, FindPackageByIdResource, ...) which
+# does not exist here, or assumes NuGetClient has a parameterless ctor / an internal
+# HttpClient, or that extraction and version-normalization are NuGetClient methods. They
+# are not: you bring your own HttpClient, extraction lives on a separate static
+# PackageExtractor, search on a separate SearchService, and NormalizeVersion is static.
+#
+# Without grounding, a web-allowed baseline reconstructs this only via expensive source
+# archaeology (nuget.org page, GitHub repo, raw .cs); a web-blocked / closed-source
+# baseline simply fails. The candidate AGENTS.md supplies exactly the missing shapes.
+# Each scenario gates on: project builds, Program.cs actually uses the NuGetFetch API
+# (not hand-rolled HttpClient calls to the nuget.org REST API), and the run prints the
+# expected, stable anchor value.
+#
+# Anchors are deterministic (verified against live nuget.org, 0.6.2):
+#   N2 oldest Newtonsoft.Json = 3.5.8 | N6 resolve 12.0.* = 12.0.3, normalize 1.0.0.0 = 1.0.0
+#   N5 prefix "Newtonsoft" includes Newtonsoft.Json.Bson | N4 IsValidPackage(Serilog 3.1.1)=True
+# =============================================================================
+
+scenarios:
+  - name: "N1: look up the latest published version of a package"
+    prompt: |
+      This console project references a small NuGet client library (see the package reference
+      in the .csproj). Using THAT library (not the official NuGet.Protocol API and not a
+      hand-written HttpClient call to the nuget.org REST endpoints), look up the latest
+      published version of the package "Newtonsoft.Json" on nuget.org and print exactly one
+      line to stdout:
+        latest: <version>
+      Build and run the project to confirm it prints the version.
+    setup:
+      files:
+        - path: Fetch.csproj
+          source: fixtures/n1/Fetch.csproj
+        - path: Program.cs
+          source: fixtures/n1/Program.cs
+    reject_tools:
+      - web_search
+      - web_fetch
+    assertions:
+      - type: run_command_and_assert
+        command_to_run: "dotnet"
+        command_arguments: "build"
+        expected_exit_code: 0
+        command_timeout: 600
+      - type: file_contains
+        path: "Program.cs"
+        value: "GetLatestVersionAsync"
+      - type: run_command_and_assert
+        command_to_run: "dotnet"
+        command_arguments: "run --no-build"
+        expected_exit_code: 0
+        expected_std_output_matches: "latest: \\d+\\.\\d+\\.\\d+"
+        command_timeout: 120
+    rubric:
+      - "Constructs NuGetClient with a caller-supplied HttpClient (no parameterless ctor exists)"
+      - "Calls GetLatestVersionAsync on the NuGetFetch client rather than the official NuGet.Protocol API"
+      - "Builds and prints a real semantic version on a 'latest:' line"
+    timeout: 900
+
+  - name: "N2: print the oldest published version of a package"
+    prompt: |
+      This console project references a small NuGet client library (see the package reference
+      in the .csproj). Using THAT library, fetch the full version list for "Newtonsoft.Json"
+      from nuget.org and print the OLDEST published version as exactly one line:
+        oldest: <version>
+      Build and run the project to confirm it prints the oldest version.
+    setup:
+      files:
+        - path: Fetch.csproj
+          source: fixtures/n2/Fetch.csproj
+        - path: Program.cs
+          source: fixtures/n2/Program.cs
+    reject_tools:
+      - web_search
+      - web_fetch
+    assertions:
+      - type: run_command_and_assert
+        command_to_run: "dotnet"
+        command_arguments: "build"
+        expected_exit_code: 0
+        command_timeout: 600
+      - type: file_contains
+        path: "Program.cs"
+        value: "GetVersionsAsync"
+      # GetVersionsAsync returns the list ASCENDING, so the oldest is list[0]; the oldest
+      # Newtonsoft.Json version on nuget.org is 3.5.8 (a stable historical fact).
+      - type: run_command_and_assert
+        command_to_run: "dotnet"
+        command_arguments: "run --no-build"
+        expected_exit_code: 0
+        expected_std_output_matches: "oldest: 3\\.5\\.8"
+        command_timeout: 120
+    rubric:
+      - "Calls GetVersionsAsync and selects the oldest entry (the list is ascending, so index 0)"
+      - "Does not hand-roll HTTP calls to the nuget.org flat-container index"
+      - "Builds and prints 'oldest: 3.5.8'"
+    timeout: 900
+
+  - name: "N3: download a specific package version to a .nupkg file"
+    prompt: |
+      This console project references a small NuGet client library (see the package reference
+      in the .csproj). Using THAT library, download version 13.0.3 of "Newtonsoft.Json" from
+      nuget.org and save it as a .nupkg file on disk (use any writable temp path). Then print
+      exactly one line with the size in bytes of the file you wrote:
+        downloaded: <bytes>
+      Build and run the project to confirm the file is written.
+    setup:
+      files:
+        - path: Fetch.csproj
+          source: fixtures/n3/Fetch.csproj
+        - path: Program.cs
+          source: fixtures/n3/Program.cs
+    reject_tools:
+      - web_search
+      - web_fetch
+    assertions:
+      - type: run_command_and_assert
+        command_to_run: "dotnet"
+        command_arguments: "build"
+        expected_exit_code: 0
+        command_timeout: 600
+      - type: file_contains
+        path: "Program.cs"
+        value: ".Download"
+      # The Newtonsoft.Json 13.0.3 .nupkg is ~2.4 MB, so the byte count has >= 6 digits.
+      - type: run_command_and_assert
+        command_to_run: "dotnet"
+        command_arguments: "run --no-build"
+        expected_exit_code: 0
+        expected_std_output_matches: "downloaded: \\d{6,}"
+        command_timeout: 120
+    rubric:
+      - "Uses a NuGetFetch download method — `DownloadAsync` (stream) or `DownloadToFileAsync` — to obtain the .nupkg and write it to disk"
+      - "Passes a caller-owned HttpClient to NuGetClient"
+      - "Builds and prints a 'downloaded:' line with the real file size in bytes"
+    timeout: 900
+
+  - name: "N4: download and extract a package, then validate it"
+    prompt: |
+      This console project references a small NuGet client library (see the package reference
+      in the .csproj). Using THAT library, download version 3.1.1 of "Serilog" from nuget.org,
+      extract the package into a directory, and use the library's own validity check on the
+      extracted directory. Print exactly one line:
+        valid: <True|False>
+      Build and run the project to confirm extraction succeeds.
+    setup:
+      files:
+        - path: Fetch.csproj
+          source: fixtures/n4/Fetch.csproj
+        - path: Program.cs
+          source: fixtures/n4/Program.cs
+    reject_tools:
+      - web_search
+      - web_fetch
+    assertions:
+      - type: run_command_and_assert
+        command_to_run: "dotnet"
+        command_arguments: "build"
+        expected_exit_code: 0
+        command_timeout: 600
+      # Extraction/validation live on the SEPARATE static PackageExtractor class, NOT on NuGetClient.
+      - type: file_contains
+        path: "Program.cs"
+        value: "PackageExtractor"
+      - type: run_command_and_assert
+        command_to_run: "dotnet"
+        command_arguments: "run --no-build"
+        expected_exit_code: 0
+        expected_std_output_matches: "valid: True"
+        command_timeout: 120
+    rubric:
+      - "Downloads via NuGetClient (DownloadAsync stream or DownloadToFileAsync) then extracts via the static PackageExtractor"
+      - "Calls PackageExtractor.IsValidPackage on the extracted directory (not a hand-written check)"
+      - "Builds and prints 'valid: True'"
+    timeout: 900
+
+  - name: "N5: search nuget.org for packages by id prefix"
+    prompt: |
+      This console project references a small NuGet client library (see the package reference
+      in the .csproj). Using THAT library, search nuget.org for packages whose id starts with
+      the prefix "Newtonsoft" and print each matching package id on its own line, prefixed:
+        pkg: <id>
+      Build and run the project to confirm it lists matches.
+    setup:
+      files:
+        - path: Fetch.csproj
+          source: fixtures/n5/Fetch.csproj
+        - path: Program.cs
+          source: fixtures/n5/Program.cs
+    reject_tools:
+      - web_search
+      - web_fetch
+    assertions:
+      - type: run_command_and_assert
+        command_to_run: "dotnet"
+        command_arguments: "build"
+        expected_exit_code: 0
+        command_timeout: 600
+      # Search lives on the SEPARATE SearchService class, via SearchByPrefixAsync.
+      - type: file_contains
+        path: "Program.cs"
+        value: "SearchByPrefixAsync"
+      - type: run_command_and_assert
+        command_to_run: "dotnet"
+        command_arguments: "run --no-build"
+        expected_exit_code: 0
+        expected_std_output_matches: "pkg: Newtonsoft\\.Json\\.Bson"
+        command_timeout: 120
+    rubric:
+      - "Constructs SearchService with a caller-supplied HttpClient and calls SearchByPrefixAsync"
+      - "Reads the .Id of each SearchResult rather than scraping the nuget.org website"
+      - "Builds and prints the prefix matches, including Newtonsoft.Json.Bson"
+    timeout: 900
+
+  - name: "N6: resolve a wildcard version and normalize a version string"
+    prompt: |
+      This console project references a small NuGet client library (see the package reference
+      in the .csproj). Using THAT library, do two things and print one line for each:
+        1. Resolve the wildcard version pattern "12.0.*" for "Newtonsoft.Json" to the highest
+           matching concrete version, and print:  resolved: <version>
+        2. Normalize the 4-part version string "1.0.0.0" to its canonical NuGet form using the
+           library's normalization helper, and print:  normalized: <version>
+      Build and run the project to confirm both lines print.
+    setup:
+      files:
+        - path: Fetch.csproj
+          source: fixtures/n6/Fetch.csproj
+        - path: Program.cs
+          source: fixtures/n6/Program.cs
+    reject_tools:
+      - web_search
+      - web_fetch
+    assertions:
+      - type: run_command_and_assert
+        command_to_run: "dotnet"
+        command_arguments: "build"
+        expected_exit_code: 0
+        command_timeout: 600
+      - type: file_contains
+        path: "Program.cs"
+        value: "ResolveVersionPatternAsync"
+      # NormalizeVersion is STATIC on NuGetClient; resolving 12.0.* yields 12.0.3 (12.x is frozen).
+      - type: run_command_and_assert
+        command_to_run: "dotnet"
+        command_arguments: "run --no-build"
+        expected_exit_code: 0
+        expected_std_output_matches: "(?=[\\s\\S]*resolved: 12\\.0\\.3)(?=[\\s\\S]*normalized: 1\\.0\\.0)"
+        command_timeout: 120
+    rubric:
+      - "Calls ResolveVersionPatternAsync(id, \"12.0.*\") to get the highest 12.0.x version"
+      - "Calls the STATIC NuGetClient.NormalizeVersion to canonicalize 1.0.0.0 -> 1.0.0"
+      - "Builds and prints 'resolved: 12.0.3' and 'normalized: 1.0.0'"
+    timeout: 900

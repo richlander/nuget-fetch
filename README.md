@@ -18,7 +18,7 @@ dotnet add package NuGetFetch
 - **Two-tier caching** — Reads `~/.nuget/packages`, writes app cache
 - **Source resolution** — Parses `nuget.config` files (with credentials)
 - **TFM resolution** — Selects highest-priority target framework
-- **Version resolution** — Latest, wildcard patterns, prerelease
+- **Version resolution** — Full ascending list, latest, wildcard patterns, prerelease
 - **Search** — Query nuget.org with prefix filtering
 
 ## Usage
@@ -31,6 +31,11 @@ NuGetClient client = new(httpClient);
 
 // Get latest version
 string? version = await client.GetLatestVersionAsync("Newtonsoft.Json");
+
+// List every published version, ascending (oldest first, newest last)
+IReadOnlyList<string> versions = await client.GetVersionsAsync("Newtonsoft.Json");
+string oldest = versions[0];
+string newest = versions[^1];
 
 // Download and extract
 using Stream nupkg = await client.DownloadAsync("Newtonsoft.Json", version!);
