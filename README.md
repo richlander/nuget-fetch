@@ -42,6 +42,9 @@ using Stream nupkg = await client.DownloadAsync("Newtonsoft.Json", version!);
 string extractPath = Path.Combine(Path.GetTempPath(), "Newtonsoft.Json");
 await PackageExtractor.ExtractAsync(nupkg, extractPath);
 
+// Does the extracted package ship managed assemblies (lib/ DLLs)?
+bool hasDlls = PackageExtractor.HasManagedLibraries(extractPath);
+
 // Find the best TFM
 string? tfmPath = TfmResolver.ResolvePackagePath(extractPath);
 ```
@@ -96,7 +99,9 @@ IReadOnlyList<PackageSource> sources = SourceResolver.ResolveSources(
 // Resolve wildcard patterns
 string? version = await client.ResolveVersionPatternAsync("Newtonsoft.Json", "13.*");
 
-// Parse "Package@Version" specs
+// Parse "Package@Version" specs into a validated PackageIdentity (.Id, .Version).
+// Prefer this over splitting on '@' yourself: it trims, leaves Version null when the
+// spec carries no version, and returns null for malformed input (e.g. "@1.0.0").
 PackageIdentity? parsed = PackageExtractor.ParsePackageReference("Newtonsoft.Json@13.0.3");
 ```
 
