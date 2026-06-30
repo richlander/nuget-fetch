@@ -55,6 +55,11 @@ IReadOnlyList<SearchResult> q = await search.SearchAsync("json", take: 20, prere
   Same for `SearchService(http)`. Reuse one `HttpClient`.
 - **`NuGetClient.NormalizeVersion(v)` is STATIC** (`"1.0.0.0"` -> `"1.0.0"`), not an instance method.
 - **Extraction/parse helpers are on `PackageExtractor` (static)**, not on `NuGetClient`.
+- **Parsing an `"id@version"` string: call `PackageExtractor.ParsePackageReference`** (returns
+  a `PackageIdentity` with `.Id`/`.Version`) — do NOT hand-split on `@`. The library owns this
+  shape; reach for the method, not `string.Split`.
+- **Checking for managed assemblies: `PackageExtractor.HasManagedLibraries(dir)`** (bool) after
+  extracting — there is no `NuGetClient` equivalent.
 - **`GetVersionsAsync` is already in ascending NuGet version order** — oldest is `list[0]`,
   newest is `list[^1]`. Do NOT re-sort the list yourself: a naive string/`OrderBy` sort is
   wrong (`"10.0.1"` sorts before `"3.5.8"` lexically). Trust the returned order; use

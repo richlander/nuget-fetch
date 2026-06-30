@@ -257,3 +257,163 @@ scenarios:
       - "Calls the STATIC NuGetClient.NormalizeVersion to canonicalize 1.0.0.0 -> 1.0.0"
       - "Builds and prints 'resolved: 12.0.3' and 'normalized: 1.0.0'"
     timeout: 900
+
+  # ---------------------------------------------------------------------------
+  # MM tier (+6 -> 12): the documented methods the Mini-6 doesn't cover. nuget-fetch's
+  # surface caps here — it does not earn a SKILL.md, so there is no CT tier.
+  # ---------------------------------------------------------------------------
+
+  - name: "N7: download a package to a stream"
+    prompt: |
+      This console project references a small NuGet client library (see the package reference
+      in the .csproj). Using THAT library (not the official NuGet.Protocol API, not a hand-written
+      HttpClient call), download version 13.0.3 of "Newtonsoft.Json" from nuget.org as a Stream
+      (not to a file) and print exactly one line: "bytes: <length>". Build and run to confirm.
+    setup:
+      files:
+        - path: Fetch.csproj
+          source: fixtures/n7/Fetch.csproj
+        - path: Program.cs
+          source: fixtures/n7/Program.cs
+    reject_tools: [web_search, web_fetch]
+    assertions:
+      - { type: run_command_and_assert, command_to_run: "dotnet", command_arguments: "build", expected_exit_code: 0, command_timeout: 600 }
+      - { type: file_contains, path: "Program.cs", value: "DownloadAsync" }
+      - type: run_command_and_assert
+        command_to_run: "dotnet"
+        command_arguments: "run --no-build"
+        expected_exit_code: 0
+        expected_std_output_matches: "bytes: \\d{6,}"
+        command_timeout: 120
+    rubric:
+      - "Constructs NuGetClient with a caller-supplied HttpClient and calls DownloadAsync to get a Stream"
+      - "Prints the stream's byte length on a 'bytes:' line"
+    timeout: 900
+
+  - name: "N8: extract a package from a stream"
+    prompt: |
+      This console project references a small NuGet client library (see the package reference
+      in the .csproj). Using THAT library, download version 13.0.3 of "Newtonsoft.Json" as a Stream,
+      extract it FROM THE STREAM to a directory, and print whether the extracted package is valid:
+      "valid: <bool>". Build and run to confirm.
+    setup:
+      files:
+        - path: Fetch.csproj
+          source: fixtures/n8/Fetch.csproj
+        - path: Program.cs
+          source: fixtures/n8/Program.cs
+    reject_tools: [web_search, web_fetch]
+    assertions:
+      - { type: run_command_and_assert, command_to_run: "dotnet", command_arguments: "build", expected_exit_code: 0, command_timeout: 600 }
+      - { type: file_contains, path: "Program.cs", value: "ExtractAsync" }
+      - type: run_command_and_assert
+        command_to_run: "dotnet"
+        command_arguments: "run --no-build"
+        expected_exit_code: 0
+        expected_std_output_matches: "valid: True"
+        command_timeout: 120
+    rubric:
+      - "Uses PackageExtractor.ExtractAsync (the static class) on the DownloadAsync stream, then PackageExtractor.IsValidPackage"
+    timeout: 900
+
+  - name: "N9: check a package has managed libraries"
+    prompt: |
+      This console project references a small NuGet client library (see the package reference
+      in the .csproj). Using THAT library, download and extract version 13.0.3 of "Newtonsoft.Json",
+      then print whether it contains managed libraries (DLLs): "hasDlls: <bool>". Build and run to confirm.
+    setup:
+      files:
+        - path: Fetch.csproj
+          source: fixtures/n9/Fetch.csproj
+        - path: Program.cs
+          source: fixtures/n9/Program.cs
+    reject_tools: [web_search, web_fetch]
+    assertions:
+      - { type: run_command_and_assert, command_to_run: "dotnet", command_arguments: "build", expected_exit_code: 0, command_timeout: 600 }
+      - { type: file_contains, path: "Program.cs", value: "HasManagedLibraries" }
+      - type: run_command_and_assert
+        command_to_run: "dotnet"
+        command_arguments: "run --no-build"
+        expected_exit_code: 0
+        expected_std_output_matches: "hasDlls: True"
+        command_timeout: 120
+    rubric:
+      - "Downloads + extracts via PackageExtractor, then calls PackageExtractor.HasManagedLibraries on the directory"
+    timeout: 900
+
+  - name: "N10: parse a package reference into id and version"
+    prompt: |
+      This console project references a small NuGet client library (see the package reference
+      in the .csproj). Using THAT library, parse the package reference "Newtonsoft.Json@13.0.1"
+      into its id and version, and print two lines: "id: <id>" and "version: <version>".
+      Build and run to confirm.
+    setup:
+      files:
+        - path: Fetch.csproj
+          source: fixtures/n10/Fetch.csproj
+        - path: Program.cs
+          source: fixtures/n10/Program.cs
+    reject_tools: [web_search, web_fetch]
+    assertions:
+      - { type: run_command_and_assert, command_to_run: "dotnet", command_arguments: "build", expected_exit_code: 0, command_timeout: 600 }
+      - { type: file_contains, path: "Program.cs", value: "ParsePackageReference" }
+      - type: run_command_and_assert
+        command_to_run: "dotnet"
+        command_arguments: "run --no-build"
+        expected_exit_code: 0
+        expected_std_output_matches: "(?=[\\s\\S]*id: Newtonsoft\\.Json)(?=[\\s\\S]*version: 13\\.0\\.1)"
+        command_timeout: 120
+    rubric:
+      - "Calls PackageExtractor.ParsePackageReference (static) and reads .Id and .Version from the returned PackageIdentity"
+    timeout: 900
+
+  - name: "N11: full-text search for a package"
+    prompt: |
+      This console project references a small NuGet client library (see the package reference
+      in the .csproj). Using THAT library's full-text search, search nuget.org for "Newtonsoft.Json"
+      (take 20, stable releases only) and print whether the package "Newtonsoft.Json" is in the
+      results: "found: <bool>". Build and run to confirm.
+    setup:
+      files:
+        - path: Fetch.csproj
+          source: fixtures/n11/Fetch.csproj
+        - path: Program.cs
+          source: fixtures/n11/Program.cs
+    reject_tools: [web_search, web_fetch]
+    assertions:
+      - { type: run_command_and_assert, command_to_run: "dotnet", command_arguments: "build", expected_exit_code: 0, command_timeout: 600 }
+      - { type: file_contains, path: "Program.cs", value: "SearchAsync" }
+      - type: run_command_and_assert
+        command_to_run: "dotnet"
+        command_arguments: "run --no-build"
+        expected_exit_code: 0
+        expected_std_output_matches: "found: True"
+        command_timeout: 120
+    rubric:
+      - "Constructs SearchService with a caller-supplied HttpClient and calls SearchAsync(query, take, prerelease)"
+    timeout: 900
+
+  - name: "N12: check whether a specific version is published"
+    prompt: |
+      This console project references a small NuGet client library (see the package reference
+      in the .csproj). Using THAT library, fetch all published versions of "Newtonsoft.Json" and
+      print whether version "13.0.3" is among them: "available: <bool>". Build and run to confirm.
+    setup:
+      files:
+        - path: Fetch.csproj
+          source: fixtures/n12/Fetch.csproj
+        - path: Program.cs
+          source: fixtures/n12/Program.cs
+    reject_tools: [web_search, web_fetch]
+    assertions:
+      - { type: run_command_and_assert, command_to_run: "dotnet", command_arguments: "build", expected_exit_code: 0, command_timeout: 600 }
+      - { type: file_contains, path: "Program.cs", value: "GetVersionsAsync" }
+      - type: run_command_and_assert
+        command_to_run: "dotnet"
+        command_arguments: "run --no-build"
+        expected_exit_code: 0
+        expected_std_output_matches: "available: True"
+        command_timeout: 120
+    rubric:
+      - "Calls GetVersionsAsync and checks membership of the target version in the returned list"
+    timeout: 900
