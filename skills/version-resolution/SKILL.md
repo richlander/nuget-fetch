@@ -1,6 +1,6 @@
 ---
 name: version-resolution
-version: 0.7.0
+version: 0.7.1
 description: >-
   Use when resolving WHICH version of a package to use — latest stable vs prerelease, a floating
   wildcard pattern, or normalizing a version string — with NuGetFetch. Covers the sharp edges the

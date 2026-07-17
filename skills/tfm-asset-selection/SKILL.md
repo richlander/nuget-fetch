@@ -1,6 +1,6 @@
 ---
 name: tfm-asset-selection
-version: 0.7.0
+version: 0.7.1
 description: >-
   Use when you need to pick the right assembly out of an extracted NuGet package for a target
   framework — a package ships lib/netstandard2.0 + lib/net8.0 + lib/net48 and you must choose the

@@ -1,6 +1,6 @@
 ---
 name: package-sources-and-auth
-version: 0.7.0
+version: 0.7.1
 description: >-
   Use when a fetch must go beyond nuget.org — discover and honor nuget.config sources, respect
   source precedence and <clear/>, or hit a private/authenticated feed with credentials. NuGetFetch's

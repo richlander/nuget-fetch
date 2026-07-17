@@ -1,6 +1,6 @@
 ---
 name: signature-verification
-version: 0.7.0
+version: 0.7.1
 description: >-
   Use when you must verify a NuGet package's signature — is a .nupkg validly signed, by the author or
   by the repository (nuget.org), and is it trusted? NuGetFetch's static PackageSignatureVerifier checks

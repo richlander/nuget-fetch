@@ -1,6 +1,6 @@
 {
   "name": "nugetfetch",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "NuGetFetch workflow skills: a compact base skill plus five domain workflow skills (version-resolution, tfm-asset-selection, package-sources-and-auth, signature-verification, caching). Install all together so an agent can pull whichever a task needs.",
   "skills": ["."]
 }

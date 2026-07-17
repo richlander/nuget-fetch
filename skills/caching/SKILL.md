@@ -1,6 +1,6 @@
 ---
 name: caching
-version: 0.7.0
+version: 0.7.1
 description: >-
   Use when a tool fetches packages or nuget.org responses repeatedly and should avoid re-downloading —
   reuse the shared ~/.nuget/packages cache and/or an app-specific cache. NuGetFetch provides a two-tier
