@@ -1,0 +1,10 @@
+# Harness-only metadata for the nugetfetch grounding unit. This unit ships NO AGENTS.md
+# (SKILL.md-only methodology): the graded artifact is skills/nugetfetch/SKILL.md plus the
+# five domain workflow skills. name/description here supply the SKILL wrapper metadata the
+# harness needs for the baseline (--source none) and readme arms; package pins the NuGet id.
+name: nugetfetch
+package: NuGetFetch
+description: >-
+  NuGetFetch workflow grounding: a compact base skill (latest/oldest, download, extract,
+  search, parse) plus five domain workflow skills (version-resolution, tfm-asset-selection,
+  package-sources-and-auth, signature-verification, caching).
