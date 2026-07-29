@@ -137,6 +137,121 @@ public class NuGetApiTests
         Assert.Empty(result.Data);
     }
 
+    // --- Azure DevOps Artifacts sends totalHits as a JSON string, not a number ---
+    //
+    // Both payloads below are the real wire shape captured from an Azure DevOps
+    // Artifacts feed, including the ADO-only "@context", "lastReopen", and "index"
+    // members. Before the JsonNumberHandling annotation on SearchResponse.TotalHits,
+    // System.Text.Json raised:
+    //
+    //   JsonException: The JSON value could not be converted to System.Int32.
+    //                  Path: $.totalHits
+    //
+    // GetSearchResponseAsync catches that and returns null, and SearchAsync then
+    // coalesces null to an empty list. So the parse failure never surfaced as an
+    // error: an Azure DevOps search silently returned zero results, which is
+    // indistinguishable from "no package matched".
+
+    [Fact]
+    public async Task GetSearchResponseAsync_TotalHitsAsString_EmptyData()
+    {
+        string json = """
+        {
+            "@context": {"@vocab": "http://schema.nuget.org/schema#"},
+            "data": [],
+            "lastReopen": "2026-07-29T01:31:47.7885829Z",
+            "index": "PackageIndex",
+            "totalHits": "0"
+        }
+        """;
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(json));
+        var result = await NuGetApi.GetSearchResponseAsync(stream, TestContext.Current.CancellationToken);
+
+        Assert.NotNull(result);
+        Assert.Equal(0, result.TotalHits);
+        Assert.Empty(result.Data);
+    }
+
+    [Fact]
+    public async Task GetSearchResponseAsync_TotalHitsAsString_WithData()
+    {
+        // Azure DevOps reports "0" even when it returns matches, so TotalHits is not a
+        // usable count on that host. Data is the load-bearing member. This asserts the
+        // results survive regardless of what the count claims.
+        //
+        // The element shape below mirrors a real Azure DevOps hit member for member,
+        // including the empty "@id"/"registration"/"iconUrl" strings and the null
+        // "projectUrl"/"summary"/"title" that Azure DevOps sends but nuget.org does
+        // not. Package identifiers are sanitized. Note that "downloads" arrives as a
+        // real JSON number, so totalHits is the only member needing string tolerance.
+        string json = """
+        {
+            "@context": {"@vocab": "http://schema.nuget.org/schema#"},
+            "data": [
+                {
+                    "@id": "",
+                    "@type": "Package",
+                    "id": "Contoso.Internal.Core",
+                    "version": "9.0.0",
+                    "description": "Contoso.Internal.Core",
+                    "versions": [{"@id": "Contoso.Internal.Core", "downloads": 0, "version": "9.0.0"}],
+                    "authors": [],
+                    "iconUrl": "",
+                    "licenseUrl": "",
+                    "projectUrl": null,
+                    "registration": "",
+                    "summary": null,
+                    "tags": [],
+                    "title": null
+                },
+                {
+                    "@id": "",
+                    "@type": "Package",
+                    "id": "Contoso.Internal.Auth",
+                    "version": "13.4.0-preview.6",
+                    "description": "Contoso.Internal.Auth",
+                    "versions": [{"@id": "Contoso.Internal.Auth", "downloads": 0, "version": "13.4.0-preview.6"}],
+                    "authors": [],
+                    "iconUrl": "",
+                    "licenseUrl": "",
+                    "projectUrl": null,
+                    "registration": "",
+                    "summary": null,
+                    "tags": [],
+                    "title": null
+                }
+            ],
+            "lastReopen": "2026-07-29T01:31:47.7885829Z",
+            "index": "PackageIndex",
+            "totalHits": "0"
+        }
+        """;
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(json));
+        var result = await NuGetApi.GetSearchResponseAsync(stream, TestContext.Current.CancellationToken);
+
+        Assert.NotNull(result);
+        Assert.Equal(0, result.TotalHits);
+        Assert.Equal(2, result.Data.Count);
+        Assert.Equal("Contoso.Internal.Core", result.Data[0].Id);
+        Assert.Equal("9.0.0", result.Data[0].Version);
+        Assert.Equal("Contoso.Internal.Auth", result.Data[1].Id);
+        Assert.Equal("13.4.0-preview.6", result.Data[1].Version);
+    }
+
+    [Fact]
+    public async Task GetSearchResponseAsync_TotalHitsAsNumber_StillParses()
+    {
+        // Guards the other direction: nuget.org sends totalHits as a number, and
+        // AllowReadingFromString must not cost us that.
+        string json = """{"totalHits":1234,"data":[{"id":"Newtonsoft.Json","version":"13.0.3"}]}""";
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(json));
+        var result = await NuGetApi.GetSearchResponseAsync(stream, TestContext.Current.CancellationToken);
+
+        Assert.NotNull(result);
+        Assert.Equal(1234, result.TotalHits);
+        Assert.Single(result.Data);
+    }
+
     [Fact]
     public async Task GetSearchResponseAsync_MissingOptionalFields()
     {
