@@ -20,8 +20,11 @@ public record VersionIndex(
 
 // NuGet Search API
 
+// Azure DevOps Artifacts serializes totalHits as a JSON string ("0") rather than a
+// number, so reading it strictly as Int32 fails and takes the whole response down
+// with it. nuget.org sends a number. Accept both.
 public record SearchResponse(
-    int TotalHits,
+    [property: JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)] int TotalHits,
     IReadOnlyList<SearchResult> Data);
 
 public record SearchResult(
